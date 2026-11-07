@@ -40,10 +40,9 @@ Embedding A, Embedding B -> Distance (L2 / cosine) -> Threshold -> Decision + Co
 
 | Dataset | Use | Notes |
 |---|---|---|
-| KinFaceW I/II | Kinship pairs (parent–child, siblings) | gitignored; `data/raw/kinfacew` |
-| LFW | Face verification pairs | gitignored; `data/raw/lfw` |
-| YouTubeFaceDB | Pose/illumination variation | gitignored; `data/raw/youtube_facedb` |
-| CCTV samples | Low-quality, occlusion, aging | gitignored; `data/raw/cctv` |
+| KinFaceW I/II | Kinship pairs (parent–child, siblings) | gitignored; `datasets/kinfacew` |
+| LFW | Face verification pairs | gitignored; `datasets/lfw` |
+| CCTV samples | Low-quality, occlusion, aging | gitignored; `datasets/cctvface` |
 
 Splits: stratified by identity (no leakage), age bin, pose, illumination, occlusion; train/val/test = 70/15/15. Synthetic fallback used when real datasets are absent (smoke tests only — not for gate measurement).
 
@@ -92,7 +91,7 @@ All L2-normalized; deterministic pixel-derived fallback when DeepFace models una
 
 ## 8. Known Limitations
 
-- Custom Siamese trained from scratch is a SOTA-comparable *candidate*; it must be benchmarked against FaceNet/ArcFace/VGGFace/DeepFace baselines on LFW/KinFaceW/YouTubeFaceDB before production use.
+- Custom Siamese trained from scratch is a SOTA-comparable *candidate*; it must be benchmarked against FaceNet/ArcFace/VGGFace/DeepFace baselines on LFW/KinFaceW/CCTV before production use.
 - G2/G3/G4 require real, held-out datasets; synthetic fallback does not satisfy the gates.
 - Face detection (YoloFace/DeepFace) and embedding backends require their weights; pipeline degrades to OpenCV Haar / deterministic embeddings when unavailable.
 - No demographic bias audit performed yet (see docs/ETHICS_PRIVACY.md).

@@ -1,7 +1,7 @@
 # ML Pipeline
 
 ## Custom Model (SOTA-comparable candidate)
-- Custom CNN/Siamese network (OpenCV + TensorFlow/Keras) trained from scratch on KinFaceW/LFW/YouTubeFaceDB
+- Custom CNN/Siamese network (OpenCV + TensorFlow/Keras) trained from scratch on KinFaceW/LFW/CCTV
 - Benchmarked against FaceNet/ArcFace/VGGFace/DeepFace baselines using standard metrics
 - Evaluation metrics: accuracy, AUC, EER, TAR@FAR=1e-3 (face verification); accuracy/AUC/EER (kinship)
 - Model cards document performance vs SOTA across datasets and robustness scenarios
@@ -13,7 +13,7 @@
 
 ## Training
 - Framework: TensorFlow/Keras + OpenCV
-- Datasets: KinFaceW, LFW, YouTubeFaceDB, CCTV samples
+- Datasets: KinFaceW, LFW, CCTV samples
 - Splits: stratified by age/pose/illumination/occlusion
 - Tracking: MLflow (params, metrics, artifacts)
 - Reproducibility: seeded, config-driven YAML

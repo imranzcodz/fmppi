@@ -3,7 +3,6 @@
 ## Datasets
 - KinFaceW (I/II): kinship pairs (parent-child, siblings)
 - LFW: face verification pairs
-- YouTubeFaceDB: video frames, pose/illumination variation
 - CCTV samples: low-quality, occlusion, aging
 - ORL_Faces: 40 subjects × 10 images for face recognition training/eval
 
@@ -12,15 +11,14 @@
 |---|---|---|---|
 | KinFaceW I & II | https://www.kinfacew.com/ | Research use | Kinship pairs (parent-child, siblings) |
 | LFW | https://www.kaggle.com/datasets/jessicali9530/lfw-dataset | Non-commercial research use | Face verification pairs |
-| YouTubeFaceDB | https://www.cs.tau.ac.il/~wolf/ytfaces/ | Research use | Video frames, pose/illumination variation |
 | CCTV face detection | https://universe.roboflow.com/cadit/cctv-face-detection | Research use | Low-quality CCTV, occlusion, aging |
 | ORL_Faces | https://cam-orl.co.uk/facedatabase.html | Research use | 40 subjects × 10 images, face recognition |
 
 ### Combined dataset config
 All dataset roots are configured in `ml/config/default.yaml` under `datasets`:
-- `kinfacew_root`, `lfw_root`, `youtube_facedb_root`, `cctv_root`, `orl_faces_root`
+- `kinfacew_root`, `lfw_root`, `cctv_root`, `orl_faces_root`
 
-Raw data lives under `data/raw/<dataset>/` (gitignored). Manifests with licenses and
+Raw data lives under `datasets/<dataset>/` (gitignored). Manifests with licenses and
 checksums are tracked under `data/manifests/`.
 
 ### Dataset roles in training & evaluation
@@ -30,7 +28,6 @@ checksums are tracked under `data/manifests/`.
 | KinFaceW | Kinship pairs (kin/non-kin) | Kinship: accuracy, AUC, EER | G3 |
 | ORL_Faces | Face recognition (same/different subject) | Face recognition: accuracy across 40 subjects | SOTA comparison |
 | CCTV | Low-quality face pairs for robustness | Robustness under degradation (blur/noise/low-res/pose/illum/occlusion/aging) | G4 |
-| YouTubeFaceDB | Pose/illumination variation | Cross-dataset generalization | SOTA comparison |
 
 ### Training data pipeline
 `ml/train.py` loads all configured datasets via `load_all_datasets()` and trains the

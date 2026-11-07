@@ -1,7 +1,7 @@
 """Dataset manifests and lightweight dataset access.
 
-Real datasets (KinFaceW, LFW, YouTubeFaceDB, CCTV) are gitignored and expected
-under ``data/raw/``. This module reads/writes acquisition manifests and provides
+Real datasets (KinFaceW, LFW, CCTV, ORL_Faces) are gitignored and expected
+under ``datasets/``. This module reads/writes acquisition manifests and provides
 thin dataset loaders that gracefully degrade to synthetic fixtures when real
 data is absent, so the pipeline and tests can run end-to-end without downloads.
 """
@@ -91,12 +91,25 @@ def _list_images(root: str) -> List[str]:
 
 
 def load_verification_pairs(root: str) -> List[PairRecord]:
-    """Load LFW-style verification pairs from a ``pairs.txt`` if present, else
-    synthesize balanced pairs from all images under ``root``."""
-    pairs_path = os.path.join(root, "pairs.txt")
+    """Load LFW-style verification pairs from a ``pairs.txt``/``pairs.csv`` if
+    present, else synthesize balanced pairs from all images under ``root``.
+
+    LFW structure: root/lfw-deepfunneled/<person>/<person>_NNNN.jpg
+    and root/pairs.csv
+    """
     records: List[PairRecord] = []
-    if os.path.isfile(pairs_path):
-        with open(pairs_path, "r", encoding="utf-8") as fh:
+
+    # Resolve actual image root (LFW ships images under lfw-deepfunneled/)
+    image_root = root
+    lfw_sub = os.path.join(root, "lfw-deepfunneled")
+    if os.path.isdir(lfw_sub):
+        image_root = lfw_sub
+
+    # Try pairs.txt first, then pairs.csv
+    pairs_txt = os.path.join(root, "pairs.txt")
+    pairs_csv = os.path.join(root, "pairs.csv")
+    if os.path.isfile(pairs_txt):
+        with open(pairs_txt, "r", encoding="utf-8") as fh:
             for line in fh:
                 line = line.strip()
                 if not line or line.startswith("#"):
@@ -106,8 +119,8 @@ def load_verification_pairs(root: str) -> List[PairRecord]:
                     name, i1, i2 = parts
                     records.append(
                         PairRecord(
-                            path_a=os.path.join(root, name, f"{name}_{int(i1):04d}.jpg"),
-                            path_b=os.path.join(root, name, f"{name}_{int(i2):04d}.jpg"),
+                            path_a=os.path.join(image_root, name, f"{name}_{int(i1):04d}.jpg"),
+                            path_b=os.path.join(image_root, name, f"{name}_{int(i2):04d}.jpg"),
                             label=1,
                             dataset="lfw",
                         )
@@ -116,15 +129,60 @@ def load_verification_pairs(root: str) -> List[PairRecord]:
                     name1, i1, name2, i2 = parts
                     records.append(
                         PairRecord(
-                            path_a=os.path.join(root, name1, f"{name1}_{int(i1):04d}.jpg"),
-                            path_b=os.path.join(root, name2, f"{name2}_{int(i2):04d}.jpg"),
+                            path_a=os.path.join(image_root, name1, f"{name1}_{int(i1):04d}.jpg"),
+                            path_b=os.path.join(image_root, name2, f"{name2}_{int(i2):04d}.jpg"),
                             label=0,
                             dataset="lfw",
                         )
                     )
         return records
+    if os.path.isfile(pairs_csv):
+        import csv
 
-    images = _list_images(root)
+        with open(pairs_csv, "r", encoding="utf-8-sig") as fh:
+            reader = csv.DictReader(fh)
+            for row in reader:
+                # pairs.csv columns: name, imagenum1, imagenum2, (empty or num2)
+                # Same person: name, num1, num2 -> label=1
+                # Different persons: name1, num1, name2, num2 -> label=0
+                name1 = row.get("name", "")
+                i1 = row.get("imagenum1", row.get("img_num1", ""))
+                name2_or_i2 = row.get("imagenum2", row.get("img_num2", ""))
+                i2_or_empty = row.get(None, row.get("", ""))  # 4th column (empty header)
+
+                if not name1 or not i1:
+                    continue
+
+                # Try to interpret imagenum2 as int (same person) or str (different person)
+                try:
+                    i2 = int(name2_or_i2)
+                    # Same person pair
+                    path_a = os.path.join(image_root, name1, f"{name1}_{int(i1):04d}.jpg")
+                    path_b = os.path.join(image_root, name1, f"{name1}_{i2:04d}.jpg")
+                    label = 1
+                    name2 = name1
+                except (ValueError, TypeError):
+                    # Different person pair: name2_or_i2 is actually name2
+                    name2 = name2_or_i2
+                    try:
+                        i2 = int(i2_or_empty)
+                    except (ValueError, TypeError):
+                        continue
+                    path_a = os.path.join(image_root, name1, f"{name1}_{int(i1):04d}.jpg")
+                    path_b = os.path.join(image_root, name2, f"{name2}_{i2:04d}.jpg")
+                    label = 0
+
+                records.append(
+                    PairRecord(
+                        path_a=path_a,
+                        path_b=path_b,
+                        label=label,
+                        dataset="lfw",
+                    )
+                )
+        return records
+
+    images = _list_images(image_root)
     records = []
     n = min(len(images), 200)
     for i in range(n // 2):
@@ -135,10 +193,27 @@ def load_verification_pairs(root: str) -> List[PairRecord]:
 
 def load_kinship_pairs(root: str) -> List[PairRecord]:
     """Load KinFaceW-style kinship pairs from a manifest CSV/JSON if present,
-    else synthesize balanced kin/non-kin pairs."""
-    pairs_path = os.path.join(root, "pairs.json")
-    if os.path.isfile(pairs_path):
-        with open(pairs_path, "r", encoding="utf-8") as fh:
+    else synthesize balanced kin/non-kin pairs from subject folders.
+
+    KinFaceW structure: root/KinFaceW-I/images/<relation>/<pair>.jpg
+    and root/KinFaceW-I/meta_data/<relation>_pairs.mat
+    """
+    records: List[PairRecord] = []
+    if not root or not os.path.isdir(root):
+        return records
+
+    # Resolve actual image root (KinFaceW ships under KinFaceW-I/ and KinFaceW-II/)
+    kin_dirs = [d for d in os.listdir(root) if os.path.isdir(os.path.join(root, d)) and d.startswith("KinFaceW")]
+    image_roots: List[str] = []
+    for kd in kin_dirs:
+        img_dir = os.path.join(root, kd, "images")
+        if os.path.isdir(img_dir):
+            image_roots.append(img_dir)
+
+    # Try pairs.json first
+    pairs_json = os.path.join(root, "pairs.json")
+    if os.path.isfile(pairs_json):
+        with open(pairs_json, "r", encoding="utf-8") as fh:
             data = json.load(fh)
         return [
             PairRecord(
@@ -150,12 +225,46 @@ def load_kinship_pairs(root: str) -> List[PairRecord]:
             )
             for item in data
         ]
-    images = _list_images(root)
-    records = []
-    n = min(len(images), 200)
-    for i in range(n // 2):
-        records.append(PairRecord(images[i], images[(i + 1) % len(images)], 1, "kinfacew", "kinship"))
-        records.append(PairRecord(images[i], images[(i + n // 2) % len(images)], 0, "kinfacew", "kinship"))
+
+    # Synthesize balanced kin/non-kin pairs from all images under KinFaceW dirs
+    all_images: List[str] = []
+    for ir in image_roots:
+        all_images.extend(_list_images(ir))
+
+    if not all_images:
+        return records
+
+    # Group by relation folder for positive pairs (same relation = potential kin)
+    relation_images: Dict[str, List[str]] = {}
+    for img in all_images:
+        rel = os.path.basename(os.path.dirname(img))
+        relation_images.setdefault(rel, []).append(img)
+
+    # Positive pairs: same relation folder (capped to avoid explosion)
+    max_pairs_per_relation = 50
+    for rel, imgs in relation_images.items():
+        for i in range(len(imgs)):
+            for j in range(i + 1, min(i + max_pairs_per_relation, len(imgs))):
+                records.append(
+                    PairRecord(imgs[i], imgs[j], 1, "kinfacew", "kinship")
+                )
+
+    # Negative pairs: different relation folders
+    import random
+
+    rng = random.Random(42)
+    neg_pairs: List[PairRecord] = []
+    relations = sorted(relation_images.keys())
+    for i, rel_a in enumerate(relations):
+        for rel_b in relations[i + 1 :]:
+            img_a = rng.choice(relation_images[rel_a])
+            img_b = rng.choice(relation_images[rel_b])
+            neg_pairs.append(PairRecord(img_a, img_b, 0, "kinfacew", "kinship"))
+
+    # Balance: take up to as many negatives as positives
+    n_pos = len(records)
+    rng.shuffle(neg_pairs)
+    records.extend(neg_pairs[:n_pos])
     return records
 
 

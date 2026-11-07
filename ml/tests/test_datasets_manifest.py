@@ -224,9 +224,12 @@ def test_load_kinship_pairs_synthetic_fallback():
     """Test KinFaceW synthetic fallback when no pairs.json exists."""
     with tempfile.TemporaryDirectory() as tmp:
         from PIL import Image
+        # KinFaceW structure: root/KinFaceW-I/images/<relation>/
+        img_dir = os.path.join(tmp, "KinFaceW-I", "images", "father-dau")
+        os.makedirs(img_dir, exist_ok=True)
         for i in range(4):
             img = Image.new("RGB", (112, 112), color=(i * 50, 60, 90))
-            img.save(os.path.join(tmp, f"img_{i}.jpg"))
+            img.save(os.path.join(img_dir, f"pair_{i}.jpg"))
         pairs = load_kinship_pairs(tmp)
         assert len(pairs) > 0
         for p in pairs:
