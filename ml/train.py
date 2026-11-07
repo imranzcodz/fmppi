@@ -39,8 +39,6 @@ if _PROJECT_ROOT not in sys.path:
 from ml.config import load_config, resolve  # noqa: E402
 from ml.datasets import (  # noqa: E402
     load_all_datasets,
-    load_verification_pairs,
-    load_kinship_pairs,
     synthetic_verification_pairs,
 )
 from ml.inference import cosine_similarity, export_onnx  # noqa: E402
@@ -360,7 +358,6 @@ def train_model(X, y):
 
 def predict(model, X):
     """Threshold predictions from a ``train_model`` output at zero."""
-    import numpy as np
 
     scores = X @ model["weights"]
     return (scores > 0).astype(int)

@@ -1,5 +1,5 @@
 """Tests for JWT module."""
-from app.config import get_settings, settings
+from app.config import settings
 from app.security.jwt import create_access_token, create_refresh_token, decode_token
 
 
@@ -40,7 +40,6 @@ class TestDecodeToken:
     def test_decode_wrong_secret_returns_none(self):
         from jose import jwt
 
-        from app.config import settings
 
         wrong_token = jwt.encode(
             {"sub": "1", "type": "access"},

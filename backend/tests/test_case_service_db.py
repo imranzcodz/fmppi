@@ -1,6 +1,12 @@
 """Tests for case service with DB."""
-from app.models.base import Case, Person
-from app.schemas.auth import CaseCreate, CaseUpdate, EvidenceCreate, KinshipPairCreate, MatchCreate, PersonCreate
+from app.schemas.auth import (
+    CaseCreate,
+    CaseUpdate,
+    EvidenceCreate,
+    KinshipPairCreate,
+    MatchCreate,
+    PersonCreate,
+)
 from app.services.case_service import (
     can_access_case,
     create_case,

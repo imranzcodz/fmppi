@@ -62,19 +62,32 @@ def test_load_cctv_detection_missing_root():
 
 def test_load_all_datasets_returns_list():
     # All roots missing -> empty list with synthetic_fallback False behavior
+    import tempfile
     from ml.config import load_config
 
     settings = load_config("ml/config/default.yaml")
-    pairs = load_all_datasets(settings)
-    # Should be a list (possibly empty or synthetic)
+    with tempfile.TemporaryDirectory() as tmp:
+        settings.datasets.lfw_root = tmp
+        settings.datasets.kinfacew_root = tmp
+        settings.datasets.orl_faces_root = tmp
+        settings.datasets.cctv_root = tmp
+        settings.datasets.synthetic_fallback = False
+        pairs = load_all_datasets(settings)
+    # Should be a list (possibly empty)
     assert isinstance(pairs, list)
 
 
 def test_load_all_datasets_with_synthetic_fallback():
+    import tempfile
     from ml.config import load_config
 
     settings = load_config("ml/config/default.yaml")
-    settings.datasets.synthetic_fallback = True
-    pairs = load_all_datasets(settings)
+    with tempfile.TemporaryDirectory() as tmp:
+        settings.datasets.lfw_root = tmp
+        settings.datasets.kinfacew_root = tmp
+        settings.datasets.orl_faces_root = tmp
+        settings.datasets.cctv_root = tmp
+        settings.datasets.synthetic_fallback = True
+        pairs = load_all_datasets(settings)
     # With synthetic fallback, should still return a list
     assert isinstance(pairs, list)

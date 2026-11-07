@@ -1,5 +1,4 @@
 """Additional metrics tests for uncovered branches."""
-import numpy as np
 import pytest
 
 from ml.metrics import accuracy_at_threshold, auc, eer, tar_at_far

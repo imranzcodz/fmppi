@@ -5,7 +5,6 @@ using synthetic data. When real LFW/KinFaceW datasets are available, they
 should be replaced with real-data evaluations.
 """
 import numpy as np
-import pytest
 
 from ml.metrics import tar_at_far, verification_report, kinship_report, auc, eer
 

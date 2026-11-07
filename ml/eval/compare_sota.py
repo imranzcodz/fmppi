@@ -32,7 +32,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from ml.config import load_config, resolve  # noqa: E402
 from ml.datasets import (  # noqa: E402
-    load_all_datasets,
     load_kinship_pairs,
     load_verification_pairs,
     synthetic_verification_pairs,

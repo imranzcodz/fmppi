@@ -1,5 +1,5 @@
 """Tests for audit service with DB."""
-from app.models.base import AuditLog, User
+from app.models.base import User
 from app.services.audit_service import list_audit, log_audit
 
 

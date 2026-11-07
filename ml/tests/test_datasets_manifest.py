@@ -101,11 +101,17 @@ def test_load_kinship_pairs_pairs_json():
 
 
 def test_load_all_datasets_returns_pairs_with_dataset_field():
+    import tempfile
     from ml.config import load_config
 
-    settings = load_config("ml/config/default.yaml")
-    settings.datasets.synthetic_fallback = True
-    pairs = load_all_datasets(settings)
+    with tempfile.TemporaryDirectory() as tmp:
+        settings = load_config("ml/config/default.yaml")
+        settings.datasets.lfw_root = tmp
+        settings.datasets.kinfacew_root = tmp
+        settings.datasets.orl_faces_root = tmp
+        settings.datasets.cctv_root = tmp
+        settings.datasets.synthetic_fallback = True
+        pairs = load_all_datasets(settings)
     # synthetic fallback should generate pairs for all datasets
     datasets_seen = set(p.dataset for p in pairs if p.dataset)
     # At least some datasets should be represented
@@ -252,11 +258,17 @@ def test_load_verification_pairs_synthetic_fallback():
 
 def test_load_all_datasets_dedup():
     """Test that load_all_datasets de-duplicates pairs (lines 325-326, 332-333)."""
+    import tempfile
     from ml.config import load_config
 
-    settings = load_config("ml/config/default.yaml")
-    settings.datasets.synthetic_fallback = True
-    pairs = load_all_datasets(settings)
+    with tempfile.TemporaryDirectory() as tmp:
+        settings = load_config("ml/config/default.yaml")
+        settings.datasets.lfw_root = tmp
+        settings.datasets.kinfacew_root = tmp
+        settings.datasets.orl_faces_root = tmp
+        settings.datasets.cctv_root = tmp
+        settings.datasets.synthetic_fallback = True
+        pairs = load_all_datasets(settings)
     # All pairs should have unique (path_a, path_b) combinations
     seen = set()
     for p in pairs:
@@ -267,6 +279,9 @@ def test_load_all_datasets_dedup():
 
 def test_load_orl_faces_negative_pairs():
     """Test ORL_Faces negative pair generation (lines 276-278)."""
+    import tempfile
+    from ml.config import load_config
+
     with tempfile.TemporaryDirectory() as tmp:
         for subj in range(1, 4):
             sdir = os.path.join(tmp, f"s{subj}")
