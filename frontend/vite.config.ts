@@ -3,4 +3,10 @@ import { defineConfig } from 'vite'
 
 export default defineConfig({
   plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./src/__tests__/setup.ts'],
+    globals: true,
+    exclude: ['node_modules/**', 'e2e/**', 'dist/**', 'coverage/**', 'dist-ssr/**', 'local**'],
+  },
 })

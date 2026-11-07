@@ -17,4 +17,4 @@ function verifyMatch(probe, gallery) {
   return probe === gallery;
 }
 
-module.exports = { createCase, canAddEvidence, canViewAdmin, verifyMatch };
+export { createCase, canAddEvidence, canViewAdmin, verifyMatch };

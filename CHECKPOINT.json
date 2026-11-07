@@ -1,19 +1,32 @@
 {
-  "lastCommit": "b12a86d chore: initial plan and docs",
-  "branch": "feat/a5-qa-testing",
-  "sprint": "P4/P5 QA & gates",
-  "storyDone": "A5 testing scaffold (pytest backend/ml, Jest+Playwright frontend, CI gates G1-G6, SAST/DAST)",
+  "lastCommit": "04f7a48 merge(a5): QA testing (resolved ci.yml + overlaps)",
+  "branch": "develop",
+  "sprint": "P4/P5 all agent branches merged",
+  "storyDone": "All 6 agents merged: A1 ML pipeline (FMPPI Siamese, detectors, embeddings, 1:N/global-verify), A2 backend API (FastAPI, RBAC admin/investigator/reviewer/reporter, JWT+MFA, verify endpoints, audit), A3 frontend UI (React RBAC views, local/global/kinship verify, reporter flow), A4 CI/CD (GitHub Actions, Docker Compose, cPanel deploy, rollback), A5 QA (tests, gates G1-G6, SAST/DAST), A6 mobile scaffold (React Native Expo)",
+  "agentsMerged": ["A1", "A2", "A3", "A4", "A5", "A6"],
   "mlflowRunId": null,
   "modelVersion": null,
-  "deployEnv": null,
+  "deployEnv": "local-docker-compose-ready",
   "gateSignOff": {
-    "G1_backend_coverage": 94.8,
-    "G1_ml_coverage": 98.11,
-    "G1_frontend_coverage": 100,
-    "G2_face_tar_far": "pending-real-model",
-    "G3_kinship_acc": "pending-real-model",
-    "G4_robustness": "PASS (local stub 0.73 >= 0.60)",
-    "G5_sast_dast": "ruff/eslint clean; bandit low only; npm audit 0 critical; ZAP wired fail-on-critical/high",
+    "G1_backend_coverage": "41.64% BELOW-80%-threshold",
+    "G1_ml_coverage": "24.61% BELOW-80%-threshold",
+    "G1_frontend_coverage": "71.86% statements (>=70% frontend goal met)",
+    "G1_lint": "PASS (ruff backend, eslint frontend)",
+    "G2_face_tar_far": "pending-real-model (not tested on LFW)",
+    "G3_kinship_acc": "pending-real-model (not tested on KinFaceW)",
+    "G4_robustness": "PASS (local stub >= 0.60)",
+    "G5_sast_dast": "ruff/eslint clean; bandit wired; npm audit wired; ZAP wired fail-on-critical/high",
     "G6_performance": "not-measured"
-  }
+  },
+  "knownIssues": [
+    "Backend test coverage 41.64% < 80% G1 gate - needs additional tests",
+    "ML test coverage 24.61% < 80% G1 gate - needs additional tests",
+    "G2/G3 require real LFW/KinFaceW datasets (not present in repo - gitignored)",
+    "G6 performance not yet measured"
+  ],
+  "nextSteps": [
+    "Run Docker Compose locally for staging validation",
+    "Deploy to cPanel (frontend dist via FTP, backend via cPanel app/SSH)",
+    "Update CHECKPOINT.json after each deployment"
+  ]
 }

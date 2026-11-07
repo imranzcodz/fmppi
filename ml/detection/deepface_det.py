@@ -29,9 +29,12 @@ class DeepFaceDetector(FaceDetector):
             self._deepface = DeepFace
         except Exception:  # pragma: no cover - optional
             self._deepface = None
-        self._fallback = cv2.CascadeClassifier(
-            cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-        )
+        try:
+            self._fallback = cv2.CascadeClassifier(
+                cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+            )
+        except AttributeError:  # opencv build without contrib/haar
+            self._fallback = None
 
     def name(self) -> str:
         return f"deepface_{self.detector_backend}"
@@ -71,7 +74,7 @@ class DeepFaceDetector(FaceDetector):
         return detections
 
     def _detect_haar(self, image: np.ndarray) -> List[Detection]:
-        if self._fallback.empty():
+        if self._fallback is None or self._fallback.empty():
             return []
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if image.ndim == 3 else image
         faces = self._fallback.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))

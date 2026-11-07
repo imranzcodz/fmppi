@@ -1,4 +1,4 @@
-const { createCase, canAddEvidence, canViewAdmin, verifyMatch } = require("../src/caseStore");
+import { createCase, canAddEvidence, canViewAdmin, verifyMatch } from "./caseStore.js";
 
 test("createCase returns a case with open status", () => {
   const c = createCase("CASE-1", "Missing person");

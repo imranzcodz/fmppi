@@ -315,3 +315,25 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+def train_model(X, y):
+    """Simple deterministic linear model for unit-test API contract.
+
+    Returns a dict with a ``weights`` vector of shape (n_features,).
+    """
+    import numpy as np
+
+    # Simple least-squares fit: y ~ X @ w  (no intercept; data is centered)
+    A = X.T @ X + 0.01 * np.eye(X.shape[1])
+    b = X.T @ y.astype(float)
+    w = np.linalg.solve(A, b)
+    return {"weights": w}
+
+
+def predict(model, X):
+    """Threshold predictions from a ``train_model`` output at zero."""
+    import numpy as np
+
+    scores = X @ model["weights"]
+    return (scores > 0).astype(int)
