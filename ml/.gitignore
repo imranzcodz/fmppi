@@ -1,0 +1,27 @@
+# .gitignore (ml/)
+
+# Python
+__pycache__/
+*.py[c]
+*.pyc
+*.pyo
+.env
+.venv/
+.venv*/
+venv/
+
+# ML artifacts
+mlruns/
+*.onnx
+*.keras
+models/registry/*.json
+models/registry/*.pt
+models/registry/*.onnx
+
+# Datasets (gitignored per DATASET_HANDLING.md)
+data/raw/
+data/manifests/*.json
+
+# OS
+.DS_Store
+Thumbs.db
