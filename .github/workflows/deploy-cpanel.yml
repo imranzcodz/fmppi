@@ -15,7 +15,8 @@ on:
     branches: [main]
 
 env:
-  CPANEL_PUBLIC_HTML: /public_html
+  CPANEL_FRONTEND_DIR: /home/zcodz/public_html/fmppi.zcodz.com
+  CPANEL_BACKEND_DIR: /home/zcodz/fmppi
   BACKEND_APP: fmppi-api
   KEEP_LAST_BUILDS: 3
 
@@ -66,26 +67,48 @@ jobs:
           username: ${{ secrets.CPANEL_FTP_USER }}
           password: ${{ secrets.CPANEL_FTP_PASS }}
           local-dir: ./dist
-          server-dir: ${{ env.CPANEL_PUBLIC_HTML }}
+          server-dir: ${{ env.CPANEL_FRONTEND_DIR }}
           dangerous-clean-slate: false
 
   deploy-backend:
-    needs: [build, deploy-frontend]
+    needs: build
     runs-on: ubuntu-latest
     if: github.event_name == 'push' || github.event.inputs.environment == 'production'
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Deploy backend files to cPanel via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          python-version: "3.11"
-      - name: Install backend dependencies
-        run: pip install -r backend/requirements.txt
-      - name: Run DB migrations (Alembic)
-        working-directory: backend
-        run: alembic upgrade head
-        env:
-          DATABASE_URL: ${{ secrets.CPANEL_DATABASE_URL }}
-      - name: Deploy backend via SSH (PM2)
+          server: ${{ secrets.CPANEL_FTP_HOST }}
+          username: ${{ secrets.CPANEL_FTP_USER }}
+          password: ${{ secrets.CPANEL_FTP_PASS }}
+          local-dir: ./backend
+          server-dir: ${{ env.CPANEL_BACKEND_DIR }}
+          dangerous-clean-slate: false
+          exclude: |
+            **/__pycache__/**
+            **/*.pyc
+            **/*.pyo
+            **/.env
+            **/.env.example
+            **/tests/**
+            **/test_*.py
+            **/conftest.py
+            **/coverage/**
+            **/.coverage
+            **/.ruff_cache/**
+            **/*.db
+            **/*.sqlite
+            **/.git/**
+            **/.gitignore
+            uploads/**
+
+  migrate-backend:
+    needs: deploy-backend
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event.inputs.environment == 'production'
+    steps:
+      - name: Run Alembic migrations and restart backend via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.CPANEL_SSH_HOST }}
@@ -93,32 +116,28 @@ jobs:
           key: ${{ secrets.CPANEL_SSH_KEY }}
           script: |
             set -e
-            cd ~/fmppi
-            git fetch origin
-            git checkout main
-            git pull origin main
-            pip install -r backend/requirements.txt --user
+            cd ${{ env.CPANEL_BACKEND_DIR }}
+            export DATABASE_URL="${{ secrets.CPANEL_DATABASE_URL }}"
+            export SECRET_KEY="${{ secrets.CPANEL_SECRET_KEY }}"
+            export MODEL_VERSION="${{ secrets.MODEL_VERSION }}"
+            export GLOBAL_VERIFY_ENABLED="${{ secrets.GLOBAL_VERIFY_ENABLED }}"
+            pip install -r requirements.txt --user
             alembic upgrade head
             if pm2 list | grep -q "${BACKEND_APP}"; then
               pm2 restart "${BACKEND_APP}"
             else
-              pm2 start backend/main.py --name "${BACKEND_APP}"
+              pm2 start app/main.py --name "${BACKEND_APP}"
             fi
             pm2 save
         env:
-          DATABASE_URL: ${{ secrets.CPANEL_DATABASE_URL }}
-          SECRET_KEY: ${{ secrets.CPANEL_SECRET_KEY }}
-          MODEL_VERSION: ${{ secrets.MODEL_VERSION }}
-          GLOBAL_VERIFY_ENABLED: ${{ secrets.GLOBAL_VERIFY_ENABLED }}
           BACKEND_APP: ${{ env.BACKEND_APP }}
 
   rollback:
-    needs: deploy-backend
+    needs: migrate-backend
     runs-on: ubuntu-latest
     if: failure()
     steps:
-      - uses: actions/checkout@v4
-      - name: Rollback last build and down-migration
+      - name: Rollback deployment
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.CPANEL_SSH_HOST }}
@@ -126,10 +145,10 @@ jobs:
           key: ${{ secrets.CPANEL_SSH_KEY }}
           script: |
             set -e
-            cd ~/fmppi
+            cd ${{ env.CPANEL_BACKEND_DIR }}
             bash deploy/rollback.sh
         env:
-          CPANEL_PUBLIC_HTML: ${{ secrets.CPANEL_PUBLIC_HTML }}
+          CPANEL_FRONTEND_DIR: ${{ env.CPANEL_FRONTEND_DIR }}
           DATABASE_URL: ${{ secrets.CPANEL_DATABASE_URL }}
           KEEP_LAST_BUILDS: ${{ env.KEEP_LAST_BUILDS }}
-          BACKEND_DIR: ~/fmppi/backend
+          BACKEND_DIR: ${{ env.CPANEL_BACKEND_DIR }}

@@ -1,25 +1,45 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PUBLIC_HTML="${CPANEL_PUBLIC_HTML:-/public_html}"
-BACKEND_DIR="${BACKEND_DIR:-~/fmppi/backend}"
-KEEP="${KEEP_LAST_BUILDS:-3}"
+# FMPPI cPanel Rollback Script
+# Usage: bash deploy/rollback.sh
+# Environment variables:
+#   CPANEL_FRONTEND_DIR  - Frontend deployment directory (default: /home/zcodz/public_html/fmppi.zcodz.com)
+#   DATABASE_URL         - Database connection string
+#   KEEP_LAST_BUILDS     - Number of previous builds to keep (default: 3)
+#   BACKEND_DIR          - Backend deployment directory
 
-echo "==> Rollback: restore previous frontend build (keep last ${KEEP})"
-if [ -d "${PUBLIC_HTML}/builds" ]; then
-  PREVIOUS=$(ls -1d "${PUBLIC_HTML}/builds"/* 2>/dev/null | sort -r | sed -n "2p" | head -n1)
-  if [ -n "${PREVIOUS}" ]; then
-    ln -sfn "${PREVIOUS}" "${PUBLIC_HTML}/latest"
-    echo "restored previous build: ${PREVIOUS}"
-  else
-    echo "no previous build found to restore"
-  fi
+FRONTEND_DIR="${CPANEL_FRONTEND_DIR:-/home/zcodz/public_html/fmppi.zcodz.com}"
+BACKEND_DIR="${BACKEND_DIR:-/home/zcodz/fmppi}"
+KEEP_LAST_BUILDS="${KEEP_LAST_BUILDS:-3}"
+DATABASE_URL="${DATABASE_URL:-}"
+
+echo "=== FMPPI Rollback Script ==="
+echo "Frontend dir: ${FRONTEND_DIR}"
+echo "Backend dir: ${BACKEND_DIR}"
+echo "Keep last builds: ${KEEP_LAST_BUILDS}"
+
+# Rollback backend: down-migration then re-upgrade to last known good
+if [ -n "${DATABASE_URL}" ] && [ -f "${BACKEND_DIR}/alembic.ini" ]; then
+  echo "Rolling back database migration..."
+  cd "${BACKEND_DIR}"
+  export DATABASE_URL="${DATABASE_URL}"
+  alembic downgrade -1 || true
+  alembic upgrade head || true
 else
-  echo "no builds directory; skipping frontend rollback"
+  echo "Skipping database rollback (DATABASE_URL or alembic.ini not set)"
 fi
 
-echo "==> Rollback: DB down-migration (Alembic)"
-cd "${BACKEND_DIR}"
-alembic downgrade -1
+# Restart backend via PM2
+if command -v pm2 &> /dev/null; then
+  echo "Restarting backend via PM2..."
+  cd "${BACKEND_DIR}"
+  if pm2 list | grep -q "fmppi-api"; then
+    pm2 restart fmppi-api || true
+  fi
+  pm2 save || true
+else
+  echo "PM2 not found, skipping backend restart"
+fi
 
-echo "==> Rollback complete"
+echo "=== Rollback complete ==="

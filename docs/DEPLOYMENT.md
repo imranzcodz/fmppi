@@ -10,68 +10,95 @@
 ## Production (shared cPanel)
 
 ### Prerequisites
-- cPanel account with MySQL database, FTP/SFTP access, and "Setup Python App" or "Setup Node.js App" (Phusion Passenger)
-- GitHub Secrets: `CPANEL_FTP_HOST`, `CPANEL_FTP_USER`, `CPANEL_FTP_PASS`, `CPANEL_SSH_HOST`, `CPANEL_SSH_USER`, `CPANEL_SSH_KEY`
-- cPanel environment variables (set in cPanel → Environment Variables / `.env`): `SECRET_KEY`, `DATABASE_URL`, `MODEL_VERSION`, `GLOBAL_VERIFY_ENABLED`, `LOCAL_VERIFY_ENABLED`, `ML_SERVICE_URL`, `VITE_API_BASE_URL`
+- cPanel account with MySQL database, FTP access, and SSH access
+- GitHub Secrets configured (see "Secrets" below)
+- cPanel "Setup Python App" for the backend (or PM2 via SSH)
 
-### Step 1: Build & Upload Frontend
-```bash
-# Local build
-npm ci --prefix frontend
-npm run build --prefix frontend   # outputs to frontend/dist/
+### Directory Structure on cPanel
+| Component | Path | Purpose |
+|-----------|------|---------|
+| Frontend static files | `/home/zcodz/public_html/fmppi.zcodz.com/` | React Vite build output served by Apache/Nginx |
+| Backend application | `/home/zcodz/fmppi/` | FastAPI app, Alembic migrations, PM2 process |
 
-# Upload to cPanel public_html via FTP (or cPanel File Manager)
-# Target: public_html/ (or subdirectory like public_html/fmppi/)
+### Deployment Flow (GitHub Actions → cPanel)
+On every push to `main` (or manual `workflow_dispatch`):
+
+1. **Build** — Frontend is built with Vite (`npm run build`) producing `frontend/dist/`
+2. **Deploy Frontend** — `frontend/dist/` is uploaded via FTP to `/home/zcodz/public_html/fmppi.zcodz.com/`
+3. **Deploy Backend** — `backend/` source files are uploaded via FTP to `/home/zcodz/fmppi/`
+   - Excludes: `.env`, `.env.example`, `tests/`, `__pycache__/`, `*.db`, `uploads/`, `.git/`
+4. **Migrate & Restart** — SSH into cPanel, run `alembic upgrade head`, then restart `fmppi-api` via PM2
+
+### Secrets (GitHub Secrets → cPanel)
+Add these to your repository **Settings → Secrets and variables → Actions**:
+
+| Secret | Description | Example |
+|--------|-------------|---------|
+| `CPANEL_FTP_HOST` | cPanel FTP host | `ftp.zcodz.com` or `zcodz.com` |
+| `CPANEL_FTP_USER` | cPanel FTP username | `zcodz` |
+| `CPANEL_FTP_PASS` | cPanel FTP password | *(your password)* |
+| `CPANEL_SSH_HOST` | cPanel SSH host | `zcodz.com` |
+| `CPANEL_SSH_USER` | cPanel SSH username | `zcodz` |
+| `CPANEL_SSH_KEY` | cPanel SSH private key | OpenSSH private key |
+| `CPANEL_DATABASE_URL` | cPanel MySQL connection string | `mysql+pymysql://user:pass@localhost/db` |
+| `CPANEL_SECRET_KEY` | Django/FastAPI secret key | *(random string)* |
+| `MODEL_VERSION` | ML model version tag | `v1` |
+| `GLOBAL_VERIFY_ENABLED` | Enable global web search | `true` |
+
+### cPanel Setup Steps (One-Time)
+
+#### 1. Create MySQL Database
+- cPanel → MySQL Databases → Create database `fmppi`
+- Create MySQL user and assign to database with all privileges
+- Note the connection string for `CPANEL_DATABASE_URL`
+
+#### 2. Setup Python App (Optional - if using cPanel Python App)
+- cPanel → Software → "Setup Python App"
+- Python version: 3.11
+- Application root: `/home/zcodz/fmppi`
+- Application URL: `fmppi.zcodz.com` or subdomain
+- Entry point: `main:app` (or `backend/app/main:app` depending on structure)
+- Add environment variables from secrets above
+- Click "Create"
+
+#### 3. Setup PM2 (Alternative to cPanel Python App)
+- SSH into cPanel: `ssh zcodz@zcodz.com`
+- Install PM2: `npm install -g pm2` (or use Node.js selector in cPanel)
+- The GitHub Action will start `pm2 start main.py --name fmppi-api`
+
+#### 4. Frontend Domain
+- cPanel → Domains → Add `fmppi.zcodz.com` as an addon domain or subdomain
+- Document root: `/home/zcodz/public_html/fmppi.zcodz.com`
+
+### Rollback
+- On deployment failure, the `rollback` job runs:
+  1. `alembic downgrade -1` then `alembic upgrade head`
+  2. `pm2 restart fmppi-api`
+- Custom rollback script: `deploy/rollback.sh`
+
+### Files NOT Deployed to cPanel
+The following are excluded from FTP upload:
+- `.env`, `.env.example` (secrets — set via cPanel environment variables)
+- `tests/`, `test_*.py`, `conftest.py`
+- `__pycache__/`, `*.pyc`, `*.pyo`
+- `*.db`, `*.sqlite` (local databases)
+- `uploads/` (user-uploaded evidence — managed separately)
+- `.git/`, `.gitignore`
+- `.ruff_cache/`, `coverage/`, `.coverage`
+
+### Environment Variables on cPanel
+Set these in cPanel → Software → "Setup Python App" → Environment Variables, or via `.env` file in `/home/zcodz/fmppi/`:
+
+```
+DATABASE_URL=mysql+pymysql://user:pass@localhost/fmppi
+SECRET_KEY=your-secret-key-here
+MODEL_VERSION=v1
+GLOBAL_VERIFY_ENABLED=true
+ML_SERVICE_URL=http://localhost:8001
 ```
 
-### Step 2: Backend via cPanel "Setup Python App"
-1. Log in to cPanel → Software → "Setup Python App"
-2. Create application: Python 3.11, app root `/home/user/fmppi-backend`, app URL `/api` (or domain root)
-3. Upload backend code (excluding `node_modules/`, `__pycache__/`, `.env`, `venv/`)
-4. In cPanel "Setup Python App", enter the WSGI entry point: `backend.app.main:app` (FastAPI via Passenger)
-5. Set environment variables from `.env` (never commit secrets)
-6. Install dependencies: `pip install -r backend/requirements.txt`
-7. Run DB migrations: `cd /home/user/fmppi-backend/backend && alembic upgrade head`
-8. Restart app via cPanel
-
-### Alternative: Backend via Node.js App (Passenger)
-If using Node.js instead of Python for the API layer:
-1. cPanel → Software → "Setup Node.js App"
-2. App root `/home/user/fmppi-backend`, startup file `backend/main.py` (or adapter)
-3. Set environment variables, install dependencies, restart
-
-### Step 3: ML Inference (ONNX)
-- Export model: `python ml/train.py --config config/default.yaml` → exports ONNX to `ml/models/`
-- Upload ONNX model to cPanel (or serve from external GPU endpoint)
-- Set `ML_SERVICE_URL` env var to point to the ONNX inference service
-- If using cPanel Python app, `onnxruntime` must be in `requirements.txt`
-
-### Step 4: Database (cPanel MySQL)
-1. cPanel → Databases → MySQL Database → create DB and user
-2. Update `DATABASE_URL` in cPanel environment variables: `mysql+pymysql://user:pass@localhost:3306/dbname`
-3. Run migrations: `alembic upgrade head`
-4. Nightly DB dump via cPanel Backup or cron job
-
-### Step 5: Secrets (Never Commit)
-- `.env` is gitignored — never commit it
-- Set all secrets in cPanel environment variables or GitHub Secrets for CI/CD
-- Rotate `SECRET_KEY` and DB credentials regularly
-
-## CI/CD (GitHub Actions → cPanel)
-- `.github/workflows/deploy-cpanel.yml` runs on push to `main` or `workflow_dispatch`
-- Builds frontend, uploads `dist/` to `public_html/` via FTP
-- Deploys backend via SSH (PM2 restart or cPanel app touch)
-- Runs DB migrations via SSH
-
-## Rollback & Feature Flags
-- Keep last 3 frontend builds; revert via FTP/SFTP or cPanel File Manager.
-- DB migrations include down-scripts (Alembic); test rollback in staging first.
-- Feature flags (model version, global-verify on/off) in config/YAML; toggle without redeploy.
-- Rollback trigger: quality gate failure, security incident, or regression in KPIs.
-
-## Post-Deploy Verification
-1. Run G6 measurement: `python scripts/measure_g6.py --base-url https://your-domain.com --n 50`
-2. Verify reporter registration flow end-to-end
-3. Verify local-verify / global-verify / kinship-verify endpoints
-4. Check RBAC: reporter cannot access admin endpoints
-5. Verify audit log entries are written
+### Troubleshooting
+- **403 Forbidden on verify endpoints**: Ensure the user role has `verify:local` permission (Reporter role cannot run matches; Investigator/Admin can)
+- **Alembic migration fails**: Check `DATABASE_URL` matches cPanel MySQL credentials
+- **PM2 not found**: Install Node.js via cPanel "Setup Node.js App" then `npm install -g pm2`
+- **Frontend not loading**: Verify addon domain document root matches `/home/zcodz/public_html/fmppi.zcodz.com/`
