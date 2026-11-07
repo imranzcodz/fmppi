@@ -1,0 +1,87 @@
+project: fmppi
+seed: 42
+
+# Input / image spec
+image:
+  size: [112, 112]
+  channels: 3
+  embedding_dim: 512
+  normalization: mean_std   # mean_std | zero_one
+
+# Dataset roots (gitignored, populated at runtime via data/raw)
+datasets:
+  kinfacew_root: data/raw/kinfacew
+  lfw_root: data/raw/lfw
+  youtube_facedb_root: data/raw/youtube_facedb
+  cctv_root: data/raw/cctv
+  manifests_dir: data/manifests
+  synthetic_fallback: true   # allow smoke tests without real datasets
+
+# Face detection strategy: yolo_face | deepface
+detector:
+  name: yolo_face
+  yolo_weights: models/registry/yoloface.pt
+  conf_threshold: 0.45
+  input_size: 640
+  device: cpu   # cpu | cuda
+
+# Embedding strategy: facenet | arcface | vggface | deepface
+embedder:
+  name: deepface
+  deepface_model_name: Facenet   # Facenet | ArcFace | VGGFace | DeepFace
+  deepface_detector_backend: opencv
+  enforce_detection: false
+  alignment: true
+
+# FMPPI Siamese CNN training
+fmppt:
+  encoder: cnn
+  loss: contrastive   # contrastive | triplet
+  margin: 1.0
+  learning_rate: 1e-3
+  lr_schedule: cosine   # cosine | step | constant
+  epochs: 40
+  batch_size: 32
+  val_split: 0.15
+  test_split: 0.15
+  early_stopping_patience: 7
+  augmentation: true
+  synthetic_samples_per_class: 64   # used when real dataset absent
+
+# MLflow experiment tracking + model registry
+mlflow:
+  tracking_uri: ./mlruns
+  experiment_name: fmppi
+  register_model: true
+  model_name: fmppt-siamese
+  artifact_root: models/registry
+
+# ONNX export for CPU serving
+onnx:
+  export: true
+  output_path: models/registry/fmppt.onnx
+  opset: 13
+  batch_size: 1
+
+# 1:N local search
+search:
+  index_path: models/registry/search_index.json
+  top_k: 10
+  distance: cosine   # cosine | euclidean
+  threshold: 0.4
+
+# Robustness degradation suite
+robustness:
+  severities: [mild, moderate, severe]
+  degradations: [blur, noise, low_res, pose, illum, occlusion, aging]
+  gate_min_accuracy: 0.60
+
+# Quality gates (G2-G4)
+gates:
+  g2_tar_at_far_1e_3: 0.99
+  g3_kinship_accuracy: 0.75
+  g4_robustness_accuracy: 0.60
+
+serving:
+  p95_target_seconds: 2.0
+  batch_inference: true
