@@ -27,10 +27,12 @@ build/
 # ML artifacts
 mlruns/
 ml/models/
+models/
 *.onnx
 *.h5
 *.pkl
 *.pt
+*.keras
 
 # Node
 node_modules/
