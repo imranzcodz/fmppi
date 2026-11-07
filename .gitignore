@@ -52,3 +52,13 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Raw datasets (large, gitignored; only manifests tracked)
+datasets/
+data/raw/*/
+!data/raw/*/.gitkeep
+
+# Generated artifacts
+uploads/
+backend/uploads/
+frontend/coverage/
