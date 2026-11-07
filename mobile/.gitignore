@@ -1,0 +1,23 @@
+# Expo / React Native
+node_modules/
+.expo/
+web-build/
+
+# iOS
+ios/Pods/
+*.xcworkspace
+ios/*.xcodeproj
+
+# Android
+android/.gradle/
+android/gradlew
+android/gradlew.bat
+android/local.properties
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env / secrets
+.env
+.env.*
