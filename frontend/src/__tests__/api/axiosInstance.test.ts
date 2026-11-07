@@ -7,7 +7,7 @@ vi.mock('axios', () => {
   const create = vi.fn(() => ({
     post,
     interceptors: {
-      request: { use: vi.fn((fn) => { fn({} as any); return 0 }) },
+      request: { use: vi.fn((fn) => { fn({} as unknown as AxiosInstance); return 0 }) },
       response: { use: vi.fn() },
     },
   }))

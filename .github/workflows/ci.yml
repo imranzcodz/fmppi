@@ -25,6 +25,8 @@ jobs:
           node-version: "20"
       - name: Install backend deps
         run: pip install -r backend/requirements.txt
+      - name: Install ruff
+        run: pip install ruff
       - name: Install frontend deps
         run: npm ci --prefix frontend
       - name: SAST ruff (backend + ml)

@@ -25,7 +25,7 @@ describe('verifyApi', () => {
     const file = new File(['fake'], 'face.jpg', { type: 'image/jpeg' })
     const res = await verifyApi.local(file)
     expect(mockPost).toHaveBeenCalled()
-    const [url, body, config] = mockPost.mock.calls[0]
+    const [url, , config] = mockPost.mock.calls[0]
     expect(url).toBe('/verify/local')
     expect(config?.headers?.['Content-Type']).toBe('multipart/form-data')
     expect(res.matches).toEqual([])

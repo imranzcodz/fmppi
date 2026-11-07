@@ -17,7 +17,7 @@ const mockMfaVerify = vi.mocked(authApi.mfaVerify)
 const mockRegister = vi.mocked(authApi.register)
 
 const Harness = () => {
-  const { user, isAuthenticated, loading, login, mfaVerify, register, logout, hasRole, hasAnyRole } = useAuth()
+  const { user, isAuthenticated, loading, login, logout, hasRole, hasAnyRole } = useAuth()
   if (loading) return <span data-testid="loading">loading</span>
   return (
     <div>
@@ -84,7 +84,7 @@ describe('AuthProvider edge cases', () => {
       <AuthProvider>
         <Harness />
       </AuthProvider>
-    ).container.firstChild as any
+    ).container.firstChild as unknown as HTMLElement
     // Use useAuth directly in a test component
     const TestComp = () => {
       const { register } = useAuth()
@@ -114,6 +114,18 @@ describe('AuthProvider edge cases', () => {
     expect(true).toBe(true)
   })
 
+  it('restores user from sessionStorage on mount', () => {
+    sessionStorage.setItem('fmppi_user', JSON.stringify({ id: '9', email: 'restored@b.c', role: 'admin', createdAt: 't', mfaEnabled: false }))
+    storage.setAccessToken('stored-token')
+    render(
+      <AuthProvider>
+        <Harness />
+      </AuthProvider>
+    )
+    expect(screen.getByTestId('state').textContent).toBe('auth')
+    expect(screen.getByTestId('role').textContent).toBe('admin')
+  })
+
   it('hasAnyRole returns true when user matches any role', () => {
     const TestComp = () => {
       const { hasAnyRole } = useAuth()
@@ -126,17 +138,5 @@ describe('AuthProvider edge cases', () => {
     )
     fireEvent.click(screen.getByTestId('check-any'))
     expect(true).toBe(true)
-  })
-
-  it('restores user from sessionStorage on mount', () => {
-    sessionStorage.setItem('fmppi_user', JSON.stringify({ id: '9', email: 'restored@b.c', role: 'admin', createdAt: 't', mfaEnabled: false }))
-    storage.setAccessToken('stored-token')
-    render(
-      <AuthProvider>
-        <Harness />
-      </AuthProvider>
-    )
-    expect(screen.getByTestId('state').textContent).toBe('auth')
-    expect(screen.getByTestId('role').textContent).toBe('admin')
   })
 })
