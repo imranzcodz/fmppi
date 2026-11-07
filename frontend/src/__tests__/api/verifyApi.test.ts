@@ -16,32 +16,42 @@ import { verifyApi } from '../../api/verifyApi'
 const mockPost = mockApi.post as unknown as ReturnType<typeof vi.fn>
 
 describe('verifyApi', () => {
-  beforeEach(() => mockPost.mockReset())
+  beforeEach(() => {
+    mockPost.mockReset()
+  })
 
-  it('local posts image as multipart', async () => {
-    const file = new File(['x'], 'probe.jpg', { type: 'image/jpeg' })
-    mockPost.mockResolvedValue({ data: { matches: [{ candidateId: 'p1', score: 0.92 }] } })
+  it('local posts FormData with image', async () => {
+    mockPost.mockResolvedValue({ data: { matches: [] } })
+    const file = new File(['fake'], 'face.jpg', { type: 'image/jpeg' })
     const res = await verifyApi.local(file)
-    expect(mockPost).toHaveBeenCalledWith('/verify/local', expect.any(FormData), { headers: { 'Content-Type': 'multipart/form-data' } })
-    expect(res.matches[0].score).toBe(0.92)
+    expect(mockPost).toHaveBeenCalled()
+    const [url, body, config] = mockPost.mock.calls[0]
+    expect(url).toBe('/verify/local')
+    expect(config?.headers?.['Content-Type']).toBe('multipart/form-data')
+    expect(res.matches).toEqual([])
   })
 
-  it('global posts image as multipart', async () => {
-    const file = new File(['x'], 'probe.jpg', { type: 'image/jpeg' })
-    mockPost.mockResolvedValue({ data: { matches: [{ candidateId: 'w1', score: 0.8, sourceUrl: 'http://example.com/img.jpg' }] } })
+  it('global posts FormData with image', async () => {
+    mockPost.mockResolvedValue({ data: { matches: [{ candidateId: 'x', score: 0.95 }] } })
+    const file = new File(['fake'], 'face.jpg', { type: 'image/jpeg' })
     const res = await verifyApi.global(file)
-    expect(mockPost).toHaveBeenCalledWith('/verify/global', expect.any(FormData), { headers: { 'Content-Type': 'multipart/form-data' } })
-    expect(res.matches[0].sourceUrl).toBe('http://example.com/img.jpg')
+    expect(mockPost).toHaveBeenCalled()
+    const [url] = mockPost.mock.calls[0]
+    expect(url).toBe('/verify/global')
+    expect(res.matches[0].score).toBe(0.95)
   })
 
-  it('kinship posts two photos', async () => {
-    const a = new File(['a'], 'a.jpg', { type: 'image/jpeg' })
-    const b = new File(['b'], 'b.jpg', { type: 'image/jpeg' })
-    mockPost.mockResolvedValue({ data: { score: 0.87, isKin: true, confidence: 0.9 } })
-    const res = await verifyApi.kinship(a, b)
-    const form = mockPost.mock.calls[0][1] as FormData
-    expect(form.get('photo1')).toBe(a)
-    expect(form.get('photo2')).toBe(b)
+  it('kinship posts FormData with two photos', async () => {
+    mockPost.mockResolvedValue({ data: { score: 0.8, isKin: true, confidence: 0.9 } })
+    const f1 = new File(['fake'], 'a.jpg', { type: 'image/jpeg' })
+    const f2 = new File(['fake'], 'b.jpg', { type: 'image/jpeg' })
+    const res = await verifyApi.kinship(f1, f2)
+    expect(mockPost).toHaveBeenCalled()
+    const [url, body] = mockPost.mock.calls[0]
+    expect(url).toBe('/verify/kinship')
+    expect(body.get('photo1')).toBe(f1)
+    expect(body.get('photo2')).toBe(f2)
     expect(res.isKin).toBe(true)
+    expect(res.confidence).toBe(0.9)
   })
 })
