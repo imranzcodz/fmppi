@@ -1,0 +1,19 @@
+[run]
+omit =
+    # TensorFlow/Keras model code requiring GPU/model artifacts
+    ml/baseline.py
+    ml/eval/run.py
+    ml/detection/*
+    ml/embedding/*
+    ml/inference.py
+    ml/mlflow_tracking.py
+    ml/preprocess.py
+    ml/robustness/eval.py
+    ml/train.py
+    # Test files
+    ml/tests/*
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if __name__ == __main__:

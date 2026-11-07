@@ -1,12 +1,14 @@
 import os
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-import main
-import database
-import models
+
 import auth
+import database
+import main
+import models
 
 
 @pytest.fixture(scope="session")

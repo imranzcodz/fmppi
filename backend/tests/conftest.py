@@ -1,3 +1,8 @@
+import os
+
+# Force SQLite for tests before any app module imports settings
+os.environ["DATABASE_URL"] = "sqlite:///./test_fmppi.db"
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
