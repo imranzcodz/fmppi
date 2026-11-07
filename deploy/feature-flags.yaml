@@ -1,0 +1,11 @@
+feature_flags:
+  model_version: "v1"
+  global_verify_enabled: true
+  local_verify_enabled: true
+  kinship_verification_enabled: true
+  ml_inference_backend: "onnx"
+
+rollout:
+  global_verify:
+    percentage: 100
+    stickiness: "user_id"

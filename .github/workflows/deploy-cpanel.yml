@@ -2,33 +2,134 @@ name: Deploy to cPanel
 
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        default: "production"
+        type: choice
+        options:
+          - staging
+          - production
   push:
     branches: [main]
 
+env:
+  CPANEL_PUBLIC_HTML: /public_html
+  BACKEND_APP: fmppi-api
+  KEEP_LAST_BUILDS: 3
+
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
+    outputs:
+      build_id: ${{ steps.build_id.outputs.id }}
     steps:
       - uses: actions/checkout@v4
-      - name: Build frontend
+      - id: build_id
+        run: echo "id=$(date +%Y%m%d%H%M%S)-${{ github.run_id }}" >> $GITHUB_OUTPUT
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install & build frontend
         run: |
           npm ci --prefix frontend
           npm run build --prefix frontend
-      - name: Deploy via FTP to cPanel
+      - name: Archive frontend dist
+        run: tar -czf frontend-dist.tar.gz -C frontend dist
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist-${{ steps.build_id.outputs.id }}
+          path: frontend-dist.tar.gz
+          retention-days: 7
+
+  deploy-frontend:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event.inputs.environment == 'production'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist-${{ needs.build.outputs.build_id }}
+          path: ./dist-archive
+      - name: Extract frontend dist
+        run: tar -xzf dist-archive/frontend-dist.tar.gz
+      - name: Deploy frontend to cPanel public_html via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.CPANEL_FTP_HOST }}
           username: ${{ secrets.CPANEL_FTP_USER }}
           password: ${{ secrets.CPANEL_FTP_PASS }}
-          local-dir: ./frontend/dist/
-          server-dir: /public_html/
-      - name: Deploy backend (Node/Python) via SSH
+          local-dir: ./dist
+          server-dir: ${{ env.CPANEL_PUBLIC_HTML }}
+          dangerous-clean-slate: false
+
+  deploy-backend:
+    needs: [build, deploy-frontend]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event.inputs.environment == 'production'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Run DB migrations (Alembic)
+        working-directory: backend
+        run: alembic upgrade head
+        env:
+          DATABASE_URL: ${{ secrets.CPANEL_DATABASE_URL }}
+      - name: Deploy backend via SSH (PM2)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.CPANEL_SSH_HOST }}
           username: ${{ secrets.CPANEL_SSH_USER }}
           key: ${{ secrets.CPANEL_SSH_KEY }}
           script: |
-            cd ~/fmppi && git pull origin main
+            set -e
+            cd ~/fmppi
+            git fetch origin
+            git checkout main
+            git pull origin main
             pip install -r backend/requirements.txt --user
-            pm2 restart fmppi-api || pm2 start backend/main.py --name fmppi-api
+            alembic upgrade head
+            if pm2 list | grep -q "${BACKEND_APP}"; then
+              pm2 restart "${BACKEND_APP}"
+            else
+              pm2 start backend/main.py --name "${BACKEND_APP}"
+            fi
+            pm2 save
+        env:
+          DATABASE_URL: ${{ secrets.CPANEL_DATABASE_URL }}
+          SECRET_KEY: ${{ secrets.CPANEL_SECRET_KEY }}
+          MODEL_VERSION: ${{ secrets.MODEL_VERSION }}
+          GLOBAL_VERIFY_ENABLED: ${{ secrets.GLOBAL_VERIFY_ENABLED }}
+          BACKEND_APP: ${{ env.BACKEND_APP }}
+
+  rollback:
+    needs: deploy-backend
+    runs-on: ubuntu-latest
+    if: failure()
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rollback last build and down-migration
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.CPANEL_SSH_HOST }}
+          username: ${{ secrets.CPANEL_SSH_USER }}
+          key: ${{ secrets.CPANEL_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/fmppi
+            bash deploy/rollback.sh
+        env:
+          CPANEL_PUBLIC_HTML: ${{ secrets.CPANEL_PUBLIC_HTML }}
+          DATABASE_URL: ${{ secrets.CPANEL_DATABASE_URL }}
+          KEEP_LAST_BUILDS: ${{ env.KEEP_LAST_BUILDS }}
+          BACKEND_DIR: ~/fmppi/backend
