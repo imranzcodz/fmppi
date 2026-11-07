@@ -280,7 +280,6 @@ def test_load_all_datasets_dedup():
 def test_load_orl_faces_negative_pairs():
     """Test ORL_Faces negative pair generation (lines 276-278)."""
     import tempfile
-    from ml.config import load_config
 
     with tempfile.TemporaryDirectory() as tmp:
         for subj in range(1, 4):

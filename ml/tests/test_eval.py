@@ -1,8 +1,7 @@
 import numpy as np
-import sys
 
 from train import train_model, predict
-from eval.robustness import degrade, verify_score
+from eval.robustness import degrade
 
 
 def test_train_predict_shapes(golden_dataset):
@@ -57,9 +56,6 @@ def test_verify_score():
 
 def test_main_gate_exits_zero(monkeypatch):
     import eval.robustness as r
-
-    # monkeypatch main to avoid loading real data
-    orig_main = r.main
 
     def fake_main():
         return 0
