@@ -90,7 +90,7 @@ jobs:
       - name: Lint (eslint)
         run: npm run lint --prefix frontend
       - name: Type check (tsc)
-        run: npx tsc --noEmit --prefix frontend || true
+        run: npx tsc -b --noEmit --prefix frontend || true
       - name: Run frontend tests with coverage
         run: npm run test:coverage --prefix frontend
       - name: Security audit (npm audit, critical only)
