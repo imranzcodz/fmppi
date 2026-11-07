@@ -3,6 +3,7 @@ import { defineConfig } from 'vite'
 
 export default defineConfig({
   plugins: [react()],
+  // @ts-expect-error - test property added by vitest plugin
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/__tests__/setup.ts'],

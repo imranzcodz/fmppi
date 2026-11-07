@@ -12,6 +12,5 @@
     "allowImportingTsExtensions": true,
     "types": ["vite/client"]
   },
-  "include": ["src/**/*"],
-  "exclude": ["vite.config.ts", "**/__tests__/**", "**/*.test.ts", "**/*.test.tsx"]
+  "include": ["src/**/*", "vite.config.ts"]
 }

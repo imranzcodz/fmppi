@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import type { AxiosInstance } from 'axios'
 import { storage } from '../../api/storage'
 
 // Mock axios to test axiosInstance interceptors without real HTTP

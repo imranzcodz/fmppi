@@ -3,7 +3,7 @@ import { render, screen, cleanup } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { ProtectedRoute } from '../../components/auth/ProtectedRoute'
 import { useAuth } from '../../auth/AuthContext'
-import type { AuthContextType, Role } from '../../types'
+import type { Role } from '../../types'
 
 const mockUseAuth = vi.mocked(useAuth)
 const mockNavigate = vi.fn()
@@ -14,7 +14,7 @@ vi.mock('react-router-dom', () => ({
   MemoryRouter: (props: { children: React.ReactNode }) => <>{props.children}</>,
 }))
 
-const authValue = (authenticated: boolean, role: Role): AuthContextType => ({
+const authValue = (authenticated: boolean, role: Role) => ({
   user: authenticated ? { id: '1', email: 'a@b.c', role, createdAt: 't' } : null,
   loading: false,
   isAuthenticated: authenticated,
