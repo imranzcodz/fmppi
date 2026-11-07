@@ -11,8 +11,51 @@ env:
   NODE_VERSION: "20"
 
 jobs:
+  lint-sast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install backend deps
+        run: pip install -r backend/requirements.txt
+      - name: Install frontend deps
+        run: npm ci --prefix frontend
+      - name: SAST ruff (backend + ml)
+        run: ruff check backend ml
+      - name: SAST bandit (backend + ml)
+        run: bandit -r backend ml -x "*tests*" -f txt -o bandit-report.txt || true
+      - name: SAST eslint (frontend)
+        run: npm run lint --prefix frontend
+      - name: Type check mypy (backend)
+        run: mypy backend || true
+      - name: Type check tsc (frontend)
+        run: npm run typecheck --prefix frontend
+      - name: npm audit (critical only)
+        run: npm audit --audit-level=critical --prefix frontend
+
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: fmppi
+          POSTGRES_PASSWORD: fmppi
+          POSTGRES_DB: fmpptest
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fmppi -d fmpptest"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -25,11 +68,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
           pip install ruff bandit mypy
-      - name: Lint (ruff)
-        run: ruff check backend
-      - name: Type check (mypy)
-        run: mypy backend || true
-      - name: Run backend tests with coverage (G1)
+      - env:
+          FMPPI_TEST_DATABASE_URL: postgresql+psycopg2://fmppi:fmppi@localhost:5432/fmpptest
         run: pytest backend/tests --cov=backend --cov-fail-under=80 --cov-report=xml
       - name: SAST scan (bandit)
         run: bandit -r backend -f json -o bandit-report.json || true
@@ -51,6 +91,8 @@ jobs:
         run: npx tsc --noEmit --prefix frontend || true
       - name: Run frontend tests with coverage
         run: npm test --prefix frontend -- --coverage --coverageReporters=text,lcov
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e:ci --prefix frontend
       - name: Security audit (npm audit, critical only)
         run: npm audit --prefix frontend --audit-level=critical || true
 
@@ -67,7 +109,49 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r ml/requirements.txt
+      - name: Lint ruff (ml)
+        run: ruff check ml || true
+      - name: SAST bandit (ml)
+        run: bandit -r ml -x "*tests*" -f txt -o ml-bandit-report.txt || true
       - name: Run ML tests (G1)
         run: pytest ml/tests --cov=ml --cov-fail-under=80 --cov-report=xml
       - name: ML robustness gate (G4)
         run: python ml/eval/robustness.py --gate
+
+  dast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: pip install -r backend/requirements.txt
+      - run: npm ci --prefix frontend
+      - name: Start backend API for DAST
+        run: uvicorn backend.main:app --host 127.0.0.1 --port 8000 > backend-dast.log 2>&1 &
+      - name: Start frontend static server for DAST
+        run: cd frontend && node server.js > frontend-dast.log 2>&1 &
+      - name: Wait for services
+        run: |
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8000/health && break; sleep 1; done
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:3000/ && break; sleep 1; done
+      - name: OWASP ZAP baseline DAST scan (backend)
+        run: |
+          docker run -v $(pwd):/zap:zap -t owasp/zap2docker-stable zap-baseline.py -t http://127.0.0.1:8000 -r zap-backend-report.html -w /zap/zap-backend-report.md || true
+      - name: OWASP ZAP baseline DAST scan (frontend)
+        run: |
+          docker run -v $(pwd):/zap:zap -t owasp/zap2docker-stable zap-baseline.py -t http://127.0.0.1:3000 -r zap-frontend-report.html -w /zap/zap-frontend-report.md || true
+      - name: Assert DAST zero critical/high
+        run: |
+          set -e
+          for report in zap-backend-report.md zap-frontend-report.md; do
+            if [ -f "$report" ] && grep -qiE "\| *(Critical|High) *\|" "$report"; then
+              echo "::error::DAST critical/high alerts found in $report"
+              cat "$report"
+              exit 1
+            fi
+          done
+          echo "DAST: zero critical/high alerts"
