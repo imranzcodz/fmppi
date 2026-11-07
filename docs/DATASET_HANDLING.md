@@ -5,72 +5,42 @@
 - LFW: face verification pairs
 - YouTubeFaceDB: video frames, pose/illumination variation
 - CCTV samples: low-quality, occlusion, aging
-
-## Acquisition & Licensing
-- Download via official sources; record license; store raw in `data/raw/` (gitignored)
-- Checksum verification; metadata manifest (JSON)
+- ORL_Faces: 40 subjects × 10 images for face recognition training/eval
 
 ### Dataset download sources
-| Dataset | Source URL | License | Notes |
+| Dataset | Source URL | License | Use |
 |---|---|---|---|
-| LFW | http://vis-www.cs.umass.edu/lfw/ | Non-commercial research use | Face verification pairs |
-| KinFaceW I & II | https://sites.google.com/site/kfacew/ | Research use | Kinship pairs (parent-child, siblings) |
+| KinFaceW I & II | https://www.kinfacew.com/ | Research use | Kinship pairs (parent-child, siblings) |
+| LFW | https://www.kaggle.com/datasets/jessicali9530/lfw-dataset | Non-commercial research use | Face verification pairs |
 | YouTubeFaceDB | https://www.cs.tau.ac.il/~wolf/ytfaces/ | Research use | Video frames, pose/illumination variation |
-| CCTV samples | Curated internally / public CCTV datasets | Varies | Low-quality, occlusion, aging |
+| CCTV face detection | https://universe.roboflow.com/cadit/cctv-face-detection | Research use | Low-quality CCTV, occlusion, aging |
+| ORL_Faces | https://cam-orl.co.uk/facedatabase.html | Research use | 40 subjects × 10 images, face recognition |
 
-### Download script (`scripts/download_datasets.py`)
-```python
-"""Download and verify FMPPI datasets. Run: python scripts/download_datasets.py"""
-import hashlib
-from pathlib import Path
-import urllib.request
+### Combined dataset config
+All dataset roots are configured in `ml/config/default.yaml` under `datasets`:
+- `kinfacew_root`, `lfw_root`, `youtube_facedb_root`, `cctv_root`, `orl_faces_root`
 
-RAW_DIR = Path("data/raw")
-RAW_DIR.mkdir(parents=True, exist_ok=True)
+Raw data lives under `data/raw/<dataset>/` (gitignored). Manifests with licenses and
+checksums are tracked under `data/manifests/`.
 
-DATASETS = {
-    "lfw": {
-        "url": "http://vis-www.cs.umass.edu/lfw/lfw.tgz",
-        "sha256": None,  # fill in after download
-        "description": "LFW face verification dataset",
-    },
-}
+### Dataset roles in training & evaluation
+| Dataset | Training role | Evaluation role | Gate |
+|---|---|---|---|
+| LFW | Face verification pairs (same/different person) | Face verification: accuracy, AUC, EER, TAR@FAR=1e-3 | G2 |
+| KinFaceW | Kinship pairs (kin/non-kin) | Kinship: accuracy, AUC, EER | G3 |
+| ORL_Faces | Face recognition (same/different subject) | Face recognition: accuracy across 40 subjects | SOTA comparison |
+| CCTV | Low-quality face pairs for robustness | Robustness under degradation (blur/noise/low-res/pose/illum/occlusion/aging) | G4 |
+| YouTubeFaceDB | Pose/illumination variation | Cross-dataset generalization | SOTA comparison |
 
-def download(url: str, dest: Path) -> None:
-    print(f"Downloading {url} -> {dest}")
-    urllib.request.urlretrieve(url, dest)
+### Training data pipeline
+`ml/train.py` loads all configured datasets via `load_all_datasets()` and trains the
+FMPPI Siamese CNN on the combined verification pairs. Each pair retains its `dataset`
+field so per-dataset metrics are reported during training.
 
-def verify_sha256(path: Path, expected: str | None) -> bool:
-    if not expected:
-        print(f"  [skip] no checksum for {path.name}")
-        return True
-    h = hashlib.sha256(path.read_bytes()).hexdigest()
-    ok = h == expected
-    print(f"  {'OK' if ok else 'FAIL'} sha256 {path.name}")
-    return ok
-
-if __name__ == "__main__":
-    for name, meta in DATASETS.items():
-        dest = RAW_DIR / f"{name}.tgz"
-        if dest.exists():
-            print(f"{name}: already downloaded")
-        else:
-            download(meta["url"], dest)
-        verify_sha256(dest, meta["sha256"])
-```
-
-After download, extract archives into `data/raw/<dataset>/` and create a manifest:
-```json
-{
-  "dataset": "lfw",
-  "version": "1.0",
-  "source": "http://vis-www.cs.umass.edu/lfw/",
-  "license": "non-commercial research use",
-  "sha256": "<checksum>",
-  "n_pairs": 5749,
-  "downloaded_at": "2026-11-07T00:00:00Z"
-}
-```
+### SOTA comparison
+`ml/baseline.py` and `ml/eval/compare_sota.py` benchmark FaceNet, ArcFace, VGGFace,
+DeepFace, and FMPPI on each dataset separately and in aggregate, reporting per-dataset
+and aggregate accuracy/AUC/EER/TAR@FAR metrics.
 
 ## Preprocessing
 - Face detection (YoloFace/DeepFace), alignment (5-point landmarks), resize 112x112/160x160

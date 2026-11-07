@@ -46,6 +46,7 @@ class DatasetConfig:
     lfw_root: str = "data/raw/lfw"
     youtube_facedb_root: str = "data/raw/youtube_facedb"
     cctv_root: str = "data/raw/cctv"
+    orl_faces_root: str = "data/raw/orl_faces"
     manifests_dir: str = "data/manifests"
     synthetic_fallback: bool = True
 

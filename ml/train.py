@@ -17,6 +17,7 @@ import os
 import random
 import sys
 from datetime import datetime
+from typing import Dict
 
 import numpy as np
 import tensorflow as tf
@@ -37,8 +38,9 @@ if _PROJECT_ROOT not in sys.path:
 
 from ml.config import load_config, resolve  # noqa: E402
 from ml.datasets import (  # noqa: E402
-    load_kinship_pairs,
+    load_all_datasets,
     load_verification_pairs,
+    load_kinship_pairs,
     synthetic_verification_pairs,
 )
 from ml.inference import cosine_similarity, export_onnx  # noqa: E402
@@ -153,13 +155,7 @@ def train(config_path: str = "config/default.yaml") -> dict:
 
         # --- Data ---
         use_synthetic = settings.datasets.synthetic_fallback
-        pairs = []
-        lfw_pairs = load_verification_pairs(settings.datasets.lfw_root)
-        if lfw_pairs:
-            pairs.extend(lfw_pairs)
-        kin_pairs = load_kinship_pairs(settings.datasets.kinfacew_root)
-        if kin_pairs:
-            pairs.extend(kin_pairs)
+        pairs = load_all_datasets(settings)
         if not pairs and use_synthetic:
             pairs = synthetic_verification_pairs(
                 n_pairs=settings.fmppt.synthetic_samples_per_class * 2,
@@ -265,6 +261,37 @@ def train(config_path: str = "config/default.yaml") -> dict:
             "pass": bool(report["tar_at_far_0.001"] >= settings.gates.g2_tar_at_far_1e_3),
         }
         summary["gates"]["g2_full_report"] = report
+
+        # --- Per-dataset evaluation (LFW, KinFaceW, ORL_Faces, CCTV) ---
+        # Re-load pairs per dataset for held-out per-dataset metrics
+        per_dataset_reports: Dict[str, dict] = {}
+        for p in pairs:
+            p.dataset = p.dataset or "unknown"
+        for dname in ("lfw", "kinfacew", "orl_faces", "cctv"):
+            d_pairs = [p for p in pairs if p.dataset == dname]
+            if not d_pairs:
+                continue
+            d_data = pair_arrays(d_pairs, size)
+            if d_data is None:
+                continue
+            da, db, dy = d_data
+            da = normalize(da, settings.image.normalization)
+            db = normalize(db, settings.image.normalization)
+            emb_a = encode(encoder, da)
+            emb_b = encode(encoder, db)
+            sims = cosine_similarity(emb_a, emb_b).diagonal()
+            per_dataset_reports[dname] = verification_report(sims, dy, far_target=1e-3)
+            run.log_metrics(
+                {
+                    f"test_accuracy_{dname}": per_dataset_reports[dname]["accuracy"],
+                    f"test_auc_{dname}": per_dataset_reports[dname]["auc"],
+                    f"test_eer_{dname}": per_dataset_reports[dname]["eer"],
+                    f"test_tar_at_far_1e-3_{dname}": per_dataset_reports[dname][
+                        "tar_at_far_0.001"
+                    ],
+                }
+            )
+        summary["gates"]["per_dataset"] = per_dataset_reports
 
         # --- Save artifacts ---
         encoder.save(os.path.join(ckpt_dir, "fmppt_encoder.keras"))

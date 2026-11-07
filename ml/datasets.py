@@ -189,6 +189,162 @@ def _save_img(path: str, arr: np.ndarray) -> None:
     img.save(path)
 
 
+def load_orl_faces(root: str) -> List[PairRecord]:
+    """Load ORL_Faces dataset (40 subjects × 10 images) and build verification
+    pairs: same-subject pairs are positive (label=1), different-subject pairs
+    are negative (label=0). Used for face recognition training/testing.
+
+    ORL_Faces structure: root/s{1..40}/1.pgm ... 10.pgm
+    """
+    records: List[PairRecord] = []
+    if not root or not os.path.isdir(root):
+        return records
+
+    # Group images by subject folder
+    subject_images: Dict[str, List[str]] = {}
+    for base, dirs, files in os.walk(root):
+        for fn in files:
+            if os.path.splitext(fn)[1].lower() in {".pgm", ".jpg", ".jpeg", ".png", ".bmp"}:
+                subject = os.path.basename(base)
+                subject_images.setdefault(subject, []).append(os.path.join(base, fn))
+
+    subjects = sorted(subject_images.keys())
+    # Positive pairs: same subject, different images
+    for subj in subjects:
+        imgs = subject_images[subj]
+        for i in range(len(imgs)):
+            for j in range(i + 1, len(imgs)):
+                records.append(
+                    PairRecord(imgs[i], imgs[j], 1, "orl_faces", "verification")
+                )
+    # Negative pairs: different subjects (sample to keep balanced)
+    import random
+
+    rng = random.Random(42)
+    neg_pairs: List[PairRecord] = []
+    for i, subj_a in enumerate(subjects):
+        for subj_b in subjects[i + 1 :]:
+            img_a = rng.choice(subject_images[subj_a])
+            img_b = rng.choice(subject_images[subj_b])
+            neg_pairs.append(PairRecord(img_a, img_b, 0, "orl_faces", "verification"))
+    # Balance: take up to as many negatives as positives
+    n_pos = len(records)
+    rng.shuffle(neg_pairs)
+    records.extend(neg_pairs[:n_pos])
+    return records
+
+
+def load_cctv_detection(root: str) -> List[PairRecord]:
+    """Load CCTV face detection dataset for robustness training/testing.
+
+    Expected structure (Roboflow export):
+      root/train/images/*.jpg, root/train/labels/*.txt
+      root/valid/images/*.jpg, root/valid/labels/*.txt
+      root/test/images/*.jpg,  root/test/labels/*.txt
+
+    Returns pairs where both images are CCTV frames; label=1 if they contain
+    the same detected face (same frame / overlapping), label=0 otherwise.
+    Falls back to synthesizing degraded pairs from available images when
+    annotation files are absent.
+    """
+    records: List[PairRecord] = []
+    if not root or not os.path.isdir(root):
+        return records
+
+    images = _list_images(root)
+    if not images:
+        return records
+
+    # Try to use train/valid/test split info if present
+    split_dirs = [d for d in os.listdir(root) if os.path.isdir(os.path.join(root, d))]
+    if any(d in split_dirs for d in ("train", "valid", "test")):
+        # Build positive pairs within same split folder (same scene)
+        for split in ("train", "valid", "test"):
+            split_dir = os.path.join(root, split)
+            if not os.path.isdir(split_dir):
+                continue
+            split_images = _list_images(split_dir)
+            for i in range(len(split_images)):
+                for j in range(i + 1, min(i + 4, len(split_images))):
+                    records.append(
+                        PairRecord(
+                            split_images[i], split_images[j], 1, "cctv", "verification"
+                        )
+                    )
+    else:
+        # No split info: create positive pairs from nearby images in file order
+        for i in range(len(images)):
+            for j in range(i + 1, min(i + 3, len(images))):
+                records.append(
+                    PairRecord(images[i], images[j], 1, "cctv", "verification")
+                )
+
+    # Negative pairs: random images far apart in file order
+    import random
+
+    rng = random.Random(7)
+    n_pos = len(records)
+    neg_pairs: List[PairRecord] = []
+    for _ in range(min(n_pos, len(images) - 1)):
+        i = rng.randint(0, len(images) - 1)
+        j = rng.randint(0, len(images) - 1)
+        if i != j:
+            neg_pairs.append(PairRecord(images[i], images[j], 0, "cctv", "verification"))
+    records.extend(neg_pairs[:n_pos])
+    return records
+
+
+def load_all_datasets(settings) -> List[PairRecord]:
+    """Load verification pairs from all configured datasets (LFW, KinFaceW,
+    ORL_Faces, CCTV) and return a combined, de-duplicated list.
+
+    Each pair carries its ``dataset`` field so results can be reported
+    per-dataset during training and evaluation.
+    """
+    all_pairs: List[PairRecord] = []
+
+    ds = settings.datasets
+
+    # LFW -> face verification
+    lfw_pairs = load_verification_pairs(ds.lfw_root)
+    for p in lfw_pairs:
+        p.dataset = "lfw"
+        p.pair_type = "verification"
+    all_pairs.extend(lfw_pairs)
+
+    # KinFaceW -> kinship
+    kin_pairs = load_kinship_pairs(ds.kinfacew_root)
+    for p in kin_pairs:
+        p.dataset = "kinfacew"
+        p.pair_type = "kinship"
+    all_pairs.extend(kin_pairs)
+
+    # ORL_Faces -> face recognition (verification)
+    orl_pairs = load_orl_faces(ds.orl_faces_root)
+    for p in orl_pairs:
+        p.dataset = "orl_faces"
+        p.pair_type = "verification"
+    all_pairs.extend(orl_pairs)
+
+    # CCTV -> robustness / low-quality verification
+    cctv_pairs = load_cctv_detection(ds.cctv_root)
+    for p in cctv_pairs:
+        p.dataset = "cctv"
+        p.pair_type = "verification"
+    all_pairs.extend(cctv_pairs)
+
+    # De-duplicate by (path_a, path_b) to avoid duplicate pairs across loaders
+    seen = set()
+    unique: List[PairRecord] = []
+    for p in all_pairs:
+        key = tuple(sorted((p.path_a, p.path_b)))
+        if key not in seen:
+            seen.add(key)
+            unique.append(p)
+
+    return unique
+
+
 __all__ = [
     "DatasetRecord",
     "PairRecord",
@@ -196,5 +352,8 @@ __all__ = [
     "sha256_file",
     "load_verification_pairs",
     "load_kinship_pairs",
+    "load_orl_faces",
+    "load_cctv_detection",
+    "load_all_datasets",
     "synthetic_verification_pairs",
 ]

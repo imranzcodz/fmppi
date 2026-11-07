@@ -2,6 +2,8 @@
 omit =
     # TensorFlow/Keras model code requiring GPU/model artifacts
     ml/baseline.py
+    ml/compare_sota.py
+    ml/eval/compare_sota.py
     ml/eval/run.py
     ml/detection/*
     ml/embedding/*
@@ -9,6 +11,7 @@ omit =
     ml/mlflow_tracking.py
     ml/preprocess.py
     ml/robustness/eval.py
+    ml/robustness/robustness.py
     ml/train.py
     # Test files
     ml/tests/*

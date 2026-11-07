@@ -14,6 +14,7 @@ datasets:
   lfw_root: data/raw/lfw
   youtube_facedb_root: data/raw/youtube_facedb
   cctv_root: data/raw/cctv
+  orl_faces_root: data/raw/orl_faces
   manifests_dir: data/manifests
   synthetic_fallback: true   # allow smoke tests without real datasets
 

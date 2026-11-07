@@ -1,15 +1,18 @@
 """Baseline benchmark harness: FaceNet/ArcFace/VGGFace/DeepFace vs FMPPI.
 
 Evaluates each embedding strategy (and the trained FMPPI encoder) on verification
-and kinship pairs, reporting accuracy, AUC, EER and TAR@FAR=1e-3. Runs on
-synthetic data as a smoke test and on real KinFaceW/LFW when present.
+and kinship pairs across all configured datasets (LFW, KinFaceW, ORL_Faces, CCTV),
+reporting accuracy, AUC, EER and TAR@FAR=1e-3 per dataset. Runs on
+synthetic data as a smoke test and on real datasets when present.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
+from typing import Dict, List
 
 import numpy as np
 
@@ -20,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from ml.config import load_config, resolve  # noqa: E402
 from ml.datasets import (  # noqa: E402
+    load_all_datasets,
     load_kinship_pairs,
     load_verification_pairs,
     synthetic_verification_pairs,
@@ -68,95 +72,103 @@ def evaluate_fmppi(encoder, x_a, x_b, y, normalization: str):
     return verification_report(sims, y, far_target=1e-3)
 
 
+def _load_dataset_pairs(settings, dname: str) -> List:
+    """Load pairs for a specific dataset."""
+    if dname == "lfw":
+        pairs = load_verification_pairs(settings.datasets.lfw_root)
+        for p in pairs:
+            p.dataset = "lfw"
+            p.pair_type = "verification"
+    elif dname == "kinfacew":
+        pairs = load_kinship_pairs(settings.datasets.kinfacew_root)
+        for p in pairs:
+            p.dataset = "kinfacew"
+            p.pair_type = "kinship"
+    elif dname == "orl_faces":
+        from ml.datasets import load_orl_faces
+
+        pairs = load_orl_faces(settings.datasets.orl_faces_root)
+        for p in pairs:
+            p.dataset = "orl_faces"
+            p.pair_type = "verification"
+    elif dname == "cctv":
+        from ml.datasets import load_cctv_detection
+
+        pairs = load_cctv_detection(settings.datasets.cctv_root)
+        for p in pairs:
+            p.dataset = "cctv"
+            p.pair_type = "verification"
+    else:
+        pairs = []
+    return pairs
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Baseline benchmark: FaceNet/ArcFace/VGGFace/DeepFace vs FMPPI")
     parser.add_argument("--config", default="ml/config/default.yaml", help="Path to YAML config")
+    parser.add_argument(
+        "--dataset",
+        choices=["lfw", "kinfacew", "orl_faces", "cctv", "all"],
+        default="all",
+        help="Dataset to evaluate on (default: all)",
+    )
     args = parser.parse_args(argv)
     settings = load_config(args.config)
     size = settings.image.size[0]
 
-    pairs = load_verification_pairs(settings.datasets.lfw_root)
-    if not pairs and settings.datasets.synthetic_fallback:
-        pairs = synthetic_verification_pairs(
-            n_pairs=128, image_size=(size, size), seed=settings.seed
-        )
-    if not pairs:
-        raise RuntimeError("No verification pairs available.")
+    datasets_to_run = ["lfw", "kinfacew", "orl_faces", "cctv"] if args.dataset == "all" else [args.dataset]
 
-    data = _pair_arrays(pairs, size)
-    if data is None:
-        raise RuntimeError("No verification images loadable.")
-    x_a, x_b, y = data
+    results: Dict[str, dict] = {"n_pairs_per_dataset": {}, "source": "synthetic" if settings.datasets.synthetic_fallback else "real"}
 
-    results = {
-        "n_pairs": int(len(y)),
-        "source": "synthetic" if settings.datasets.synthetic_fallback else "real",
-    }
-
-    # Baselines
-    for name in ("facenet", "arcface", "vggface", "deepface"):
-        try:
-            embedder = build_embedder(
-                name,
-                detector_backend=settings.embedder.deepface_detector_backend,
-                enforce_detection=settings.embedder.enforce_detection,
+    for dname in datasets_to_run:
+        pairs = _load_dataset_pairs(settings, dname)
+        if not pairs and settings.datasets.synthetic_fallback:
+            pairs = synthetic_verification_pairs(
+                n_pairs=128, image_size=(size, size), seed=settings.seed
             )
-            results[name] = evaluate_embedder(
-                embedder, x_a, x_b, y, settings.image.normalization
-            )
-        except Exception as exc:  # pragma: no cover - backend dependent
-            results[name] = {"error": str(exc)}
+            for p in pairs:
+                p.dataset = dname
+        if not pairs:
+            results[dname] = {"error": "no pairs available"}
+            continue
 
-    # FMPPI custom encoder
-    ckpt_dir = resolve(settings.mlflow.artifact_root)
-    encoder_path = os.path.join(ckpt_dir, "fmppt_encoder.keras")
-    if os.path.exists(encoder_path):
-        import keras
+        data = _pair_arrays(pairs, size)
+        if data is None:
+            results[dname] = {"error": "no images loadable"}
+            continue
+        x_a, x_b, y = data
+        results["n_pairs_per_dataset"][dname] = int(len(y))
 
-        encoder = keras.models.load_model(encoder_path, compile=False, safe_mode=False)
-        results["fmppt"] = evaluate_fmppi(
-            encoder, x_a, x_b, y, settings.image.normalization
-        )
-    else:
-        results["fmppt"] = {"note": "no trained checkpoint; run train.py first"}
+        ds_results: Dict[str, dict] = {}
 
-    # Kinship (KinFaceW) if available
-    kin_pairs = load_kinship_pairs(settings.datasets.kinfacew_root)
-    if not kin_pairs and settings.datasets.synthetic_fallback:
-        kin_pairs = synthetic_verification_pairs(
-            n_pairs=64, image_size=(size, size), seed=settings.seed + 1
-        )
-        for p in kin_pairs:
-            p.pair_type = "kinship"
-    if kin_pairs:
-        kdata = _pair_arrays(kin_pairs, size)
-        if kdata is not None:
-            ka, kb, ky = kdata
-            kin_results = {}
-            for name in ("facenet", "arcface", "vggface", "deepface"):
-                try:
-                    embedder = build_embedder(
-                        name,
-                        detector_backend=settings.embedder.deepface_detector_backend,
-                        enforce_detection=settings.embedder.enforce_detection,
-                    )
-                    kin_results[name] = evaluate_embedder(
-                        embedder, ka, kb, ky, settings.image.normalization
-                    )
-                except Exception as exc:  # pragma: no cover
-                    kin_results[name] = {"error": str(exc)}
-            if os.path.exists(encoder_path):
-                import keras
-
-                encoder = keras.models.load_model(encoder_path, compile=False, safe_mode=False)
-                kin_results["fmppt"] = evaluate_fmppi(
-                    encoder, ka, kb, ky, settings.image.normalization
+        # Baselines
+        for name in ("facenet", "arcface", "vggface", "deepface"):
+            try:
+                embedder = build_embedder(
+                    name,
+                    detector_backend=settings.embedder.deepface_detector_backend,
+                    enforce_detection=settings.embedder.enforce_detection,
                 )
-            else:
-                kin_results["fmppt"] = {"note": "no trained checkpoint"}
-            results["kinship"] = kin_results
+                ds_results[name] = evaluate_embedder(
+                    embedder, x_a, x_b, y, settings.image.normalization
+                )
+            except Exception as exc:  # pragma: no cover - backend dependent
+                ds_results[name] = {"error": str(exc)}
 
-    import json
+        # FMPPI custom encoder
+        ckpt_dir = resolve(settings.mlflow.artifact_root)
+        encoder_path = os.path.join(ckpt_dir, "fmppt_encoder.keras")
+        if os.path.exists(encoder_path):
+            import keras
+
+            encoder = keras.models.load_model(encoder_path, compile=False, safe_mode=False)
+            ds_results["fmppt"] = evaluate_fmppi(
+                encoder, x_a, x_b, y, settings.image.normalization
+            )
+        else:
+            ds_results["fmppt"] = {"note": "no trained checkpoint; run train.py first"}
+
+        results[dname] = ds_results
 
     print(json.dumps(results, indent=2, default=str))
     return results

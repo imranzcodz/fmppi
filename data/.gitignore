@@ -1,0 +1,4 @@
+# Raw datasets are large and gitignored; only manifests are tracked
+raw/*
+!raw/*/.gitkeep
+manifests/*.json
