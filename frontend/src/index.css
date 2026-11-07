@@ -1,0 +1,15 @@
+@import 'tailwindcss'
+
+@theme {
+  --color-indigo-600: #4f46e5;
+  --color-indigo-700: #4338ca;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
