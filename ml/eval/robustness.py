@@ -147,13 +147,3 @@ def degrade(X: np.ndarray, severity: float = 0.5, seed: int = 42) -> np.ndarray:
     """Add deterministic Gaussian noise scaled by severity."""
     rng = np.random.RandomState(seed)
     return X + rng.randn(*X.shape) * severity * 0.1
-
-
-def evaluate_robustness(X: np.ndarray, y: np.ndarray, severity: float = 0.3) -> float:
-    """Train a simple model, degrade inputs, return degraded accuracy."""
-    from ml.train import train_model, predict
-
-    model = train_model(X, y)
-    X_deg = degrade(X, severity=severity)
-    preds = predict(model, X_deg)
-    return float((preds == y).mean())

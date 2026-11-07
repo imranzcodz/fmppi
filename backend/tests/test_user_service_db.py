@@ -1,6 +1,12 @@
 """Tests for user service with DB."""
-from app.models.base import User
-from app.services.user_service import create_user, delete_user, get_user, get_user_by_email, list_users, update_user
+from app.services.user_service import (
+    create_user,
+    delete_user,
+    get_user,
+    get_user_by_email,
+    list_users,
+    update_user,
+)
 
 
 class TestUserService:
@@ -47,6 +53,6 @@ class TestUserService:
         create_user(db, email="dup@example.com", password="Secret1234", role="reporter")
         try:
             create_user(db, email="dup@example.com", password="Secret1234", role="reporter")
-            assert False, "Expected ValueError"
+            raise AssertionError("Expected ValueError")
         except ValueError as exc:
             assert "Email already registered" in str(exc)

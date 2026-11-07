@@ -1,6 +1,4 @@
 """Tests for API endpoints: reporter + audit."""
-from app.models.base import AuditLog, User
-from app.schemas.auth import CaseCreate
 
 
 class TestReporterEndpoints:
@@ -64,7 +62,7 @@ class TestReporterEndpoints:
     def test_non_reporter_cannot_use_reporter_endpoint(self, client, db):
         from app.services.user_service import create_user
 
-        admin = create_user(db, email="adminapi@example.com", password="Secret1234", role="admin")
+        create_user(db, email="adminapi@example.com", password="Secret1234", role="admin")
         login = client.post(
             "/auth/login",
             json={"email": "adminapi@example.com", "password": "Secret1234"},
@@ -84,7 +82,7 @@ class TestAuditEndpoint:
     def test_audit_list_requires_admin(self, client, db):
         from app.services.user_service import create_user
 
-        reporter = create_user(db, email="auditreporter@example.com", password="Secret1234", role="reporter")
+        create_user(db, email="auditreporter@example.com", password="Secret1234", role="reporter")
         login = client.post(
             "/auth/login",
             json={"email": "auditreporter@example.com", "password": "Secret1234"},
@@ -98,7 +96,7 @@ class TestAuditEndpoint:
     def test_audit_list_admin(self, client, db):
         from app.services.user_service import create_user
 
-        admin = create_user(db, email="auditadmin@example.com", password="Secret1234", role="admin")
+        create_user(db, email="auditadmin@example.com", password="Secret1234", role="admin")
         login = client.post(
             "/auth/login",
             json={"email": "auditadmin@example.com", "password": "Secret1234"},

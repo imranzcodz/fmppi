@@ -1,7 +1,6 @@
 """Additional tests for Manifest class and dataset loader edge cases."""
 
 import json
-import json
 import os
 import tempfile
 
@@ -163,7 +162,7 @@ def test_pair_record_defaults():
 def test_dataset_record_defaults():
     from ml.datasets import DatasetRecord
 
-    r = DatasetRecord(path="x.jpg", identity="id1", label=0, dataset="test")
+    DatasetRecord(path="x.jpg", identity="id1", label=0, dataset="test")
 
 
 def test_sha256_file():

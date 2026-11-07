@@ -1,6 +1,11 @@
 """Tests for auth service with DB."""
-from app.models.base import User
-from app.services.auth_service import authenticate_user, issue_tokens, refresh_access_token, setup_mfa, verify_mfa
+from app.services.auth_service import (
+    authenticate_user,
+    issue_tokens,
+    refresh_access_token,
+    setup_mfa,
+    verify_mfa,
+)
 
 
 class TestAuthService:
@@ -20,7 +25,7 @@ class TestAuthService:
         assert found is None
 
     def test_authenticate_user_inactive(self, db):
-        user = create_user_in_db(db, "inactive@example.com", "Secret1234", "reporter", is_active=False)
+        create_user_in_db(db, "inactive@example.com", "Secret1234", "reporter", is_active=False)
         found = authenticate_user(db, "inactive@example.com", "Secret1234")
         assert found is None
 

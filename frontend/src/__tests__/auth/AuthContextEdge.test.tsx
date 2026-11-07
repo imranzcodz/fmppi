@@ -74,18 +74,6 @@ describe('AuthProvider edge cases', () => {
   })
 
   it('registers a new user', async () => {
-    render(
-      <AuthProvider>
-        <Harness />
-      </AuthProvider>
-    )
-    // register is not wired to a button in Harness; call via useAuth
-    const { register: reg } = render(
-      <AuthProvider>
-        <Harness />
-      </AuthProvider>
-    ).container.firstChild as unknown as HTMLElement
-    // Use useAuth directly in a test component
     const TestComp = () => {
       const { register } = useAuth()
       return <button data-testid="reg-btn" onClick={() => register({ email: 'new@b.c', password: 'pw', role: 'reporter' })}>Register</button>

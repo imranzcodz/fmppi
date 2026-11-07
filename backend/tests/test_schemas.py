@@ -1,5 +1,5 @@
 """Tests for schema validation."""
-from app.schemas.auth import CaseCreate, CaseOut, EvidenceCreate, UserRegister
+from app.schemas.auth import CaseCreate, EvidenceCreate, UserRegister
 
 
 class TestSchemas:
@@ -12,7 +12,7 @@ class TestSchemas:
     def test_user_register_password_too_short(self):
         import pytest
 
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             UserRegister(email="a@b.com", password="short", role="reporter")
 
     def test_case_create(self):

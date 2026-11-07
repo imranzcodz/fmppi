@@ -1,10 +1,9 @@
 """Additional tests for config.py edge cases."""
 
 import os
-import tempfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-from ml.config import _coerce, _resolve, load_config, Settings
+from ml.config import _coerce, _resolve, Settings
 
 
 def test_resolve_none():

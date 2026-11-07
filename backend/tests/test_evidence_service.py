@@ -18,7 +18,7 @@ class TestValidateUploadFile:
         file.file.read.return_value = b"%PDF fake"
         try:
             validate_upload_file(file)
-            assert False, "Expected ValueError"
+            raise AssertionError("Expected ValueError")
         except ValueError as exc:
             assert "Unsupported file type" in str(exc)
 
@@ -28,6 +28,6 @@ class TestValidateUploadFile:
         file.file.read.return_value = b""
         try:
             validate_upload_file(file)
-            assert False, "Expected ValueError"
+            raise AssertionError("Expected ValueError")
         except ValueError as exc:
             assert "Empty file" in str(exc)
