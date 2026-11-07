@@ -1,0 +1,85 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: fmppi-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-fmppi_root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-fmppi}
+      MYSQL_USER: ${MYSQL_USER:-fmppi}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-fmppi_pass}
+    ports:
+      - "3306:3306"
+    volumes:
+      - fmppi_db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - fmppi
+
+  api:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.api
+    container_name: fmppi-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: mysql+pymysql://${MYSQL_USER:-fmppi}:${MYSQL_PASSWORD:-fmppi_pass}@db:3306/${MYSQL_DATABASE:-fmppi}
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-change-me}
+      MODEL_VERSION: ${MODEL_VERSION:-v1}
+      GLOBAL_VERIFY_ENABLED: ${GLOBAL_VERIFY_ENABLED:-true}
+      ML_SERVICE_URL: http://ml:8001
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app/backend
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    networks:
+      - fmppi
+
+  ml:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.ml
+    container_name: fmppi-ml
+    restart: unless-stopped
+    environment:
+      MODEL_VERSION: ${MODEL_VERSION:-v1}
+      GLOBAL_VERIFY_ENABLED: ${GLOBAL_VERIFY_ENABLED:-true}
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./ml:/app/ml
+      - fmppi_models:/app/ml/models
+    networks:
+      - fmppi
+
+  web:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.web
+    container_name: fmppi-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+      VITE_GLOBAL_VERIFY_ENABLED: ${VITE_GLOBAL_VERIFY_ENABLED:-true}
+    ports:
+      - "5173:80"
+    networks:
+      - fmppi
+
+volumes:
+  fmppi_db_data:
+  fmppi_models:
+
+networks:
+  fmppi:
+    driver: bridge
