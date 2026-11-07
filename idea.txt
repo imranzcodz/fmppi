@@ -1,0 +1,7 @@
+I would like to build a system/framework for finding proof of identity for a missing/unidentified person using artificial intelligence and machine learning through facial recognition and kinship verification approaches.
+Call the system FMPPI (Finding Missing Person's Proof of Identity)
+Can you use OpenCV,Tensorflow, CNN/Siamese network and anything else needed.
+Must be testable in context of state-of-the-art approaches such as FaceNet, ArcFace, VGGFace, YoloFace, DeepFace and other kinship verification methods.
+Need to build a custom model then train model on various datasets such as KinFaceW, LFW, YouTubeFaceDB, 
+Must validate the system using more realistic scenarios, including low-quality CCTV images, pose variations, illumination changes, occlusions, and age differences.
+Final Output should be a secured web UI with missing person case management and RBAC user authentication. A mobile app will be an additional requirement.
