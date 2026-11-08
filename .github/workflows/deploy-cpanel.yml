@@ -64,7 +64,7 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.CPANEL_SSH_KEY }}" > ~/.ssh/id_ed25519_fmppi
-          chmod 600 ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519_fmppi
           ssh-keyscan -H ${{ secrets.CPANEL_SSH_HOST }} >> ~/.ssh/known_hosts
           scp -r ./dist/* ${{ secrets.CPANEL_SSH_USER }}@${{ secrets.CPANEL_SSH_HOST }}:${{ env.CPANEL_FRONTEND_DIR }}/
 
@@ -78,7 +78,7 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.CPANEL_SSH_KEY }}" > ~/.ssh/id_ed25519_fmppi
-          chmod 600 ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519_fmppi
           ssh-keyscan -H ${{ secrets.CPANEL_SSH_HOST }} >> ~/.ssh/known_hosts
           scp -o StrictHostKeyChecking=no -r backend/* ${{ secrets.CPANEL_SSH_USER }}@${{ secrets.CPANEL_SSH_HOST }}:${{ env.CPANEL_BACKEND_DIR }}/ \
             --exclude='__pycache__' \
