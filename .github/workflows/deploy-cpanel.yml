@@ -63,7 +63,7 @@ jobs:
       - name: Deploy frontend to cPanel via SCP
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.CPANEL_SSH_KEY }}" > ~/.ssh/id_ed25519_zcodz
+          echo "${{ secrets.CPANEL_SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_ed25519_zcodz
           chmod 600 ~/.ssh/id_ed25519_zcodz
           ssh-keyscan -H ${{ secrets.CPANEL_SSH_HOST }} >> ~/.ssh/known_hosts
           scp -r ./dist/* ${{ secrets.CPANEL_SSH_USER }}@${{ secrets.CPANEL_SSH_HOST }}:${{ env.CPANEL_FRONTEND_DIR }}/
@@ -77,7 +77,7 @@ jobs:
       - name: Deploy backend files to cPanel via SCP
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.CPANEL_SSH_KEY }}" > ~/.ssh/id_ed25519_zcodz
+          echo "${{ secrets.CPANEL_SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_ed25519_zcodz
           chmod 600 ~/.ssh/id_ed25519_zcodz
           ssh-keyscan -H ${{ secrets.CPANEL_SSH_HOST }} >> ~/.ssh/known_hosts
           scp -o StrictHostKeyChecking=no -r backend/* ${{ secrets.CPANEL_SSH_USER }}@${{ secrets.CPANEL_SSH_HOST }}:${{ env.CPANEL_BACKEND_DIR }}/ \
