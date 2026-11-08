@@ -67,7 +67,7 @@ jobs:
           username: ${{ secrets.CPANEL_FTP_USER }}
           password: ${{ secrets.CPANEL_FTP_PASS }}
           local-dir: ./dist/
-          server-dir: ${{ env.CPANEL_FRONTEND_DIR }}
+          server-dir: ${{ env.CPANEL_FRONTEND_DIR }}/
           dangerous-clean-slate: false
 
   deploy-backend:
@@ -83,7 +83,7 @@ jobs:
           username: ${{ secrets.CPANEL_FTP_USER }}
           password: ${{ secrets.CPANEL_FTP_PASS }}
           local-dir: ./backend/
-          server-dir: ${{ env.CPANEL_BACKEND_DIR }}
+          server-dir: ${{ env.CPANEL_BACKEND_DIR }}/
           dangerous-clean-slate: false
           exclude: |
             **/__pycache__/**
