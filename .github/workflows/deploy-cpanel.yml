@@ -62,11 +62,7 @@ jobs:
         run: tar -xzf dist-archive/frontend-dist.tar.gz
       - name: Deploy frontend to cPanel via SCP
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.CPANEL_SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_ed25519_zcodz
-          chmod 600 ~/.ssh/id_ed25519_zcodz
-          ssh-keyscan -H ${{ secrets.CPANEL_SSH_HOST }} >> ~/.ssh/known_hosts
-          scp -r ./dist/* ${{ secrets.CPANEL_SSH_USER }}@${{ secrets.CPANEL_SSH_HOST }}:${{ env.CPANEL_FRONTEND_DIR }}/
+          scp -o StrictHostKeyChecking=no -r ./dist/* ${{ secrets.CPANEL_SSH_USER }}@${{ secrets.CPANEL_SSH_HOST }}:${{ env.CPANEL_FRONTEND_DIR }}/
 
   deploy-backend:
     needs: build
@@ -76,10 +72,6 @@ jobs:
       - uses: actions/checkout@v4
       - name: Deploy backend files to cPanel via SCP
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.CPANEL_SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_ed25519_zcodz
-          chmod 600 ~/.ssh/id_ed25519_zcodz
-          ssh-keyscan -H ${{ secrets.CPANEL_SSH_HOST }} >> ~/.ssh/known_hosts
           scp -o StrictHostKeyChecking=no -r backend/* ${{ secrets.CPANEL_SSH_USER }}@${{ secrets.CPANEL_SSH_HOST }}:${{ env.CPANEL_BACKEND_DIR }}/ \
             --exclude='__pycache__' \
             --exclude='*.pyc' --exclude='*.pyo' \
