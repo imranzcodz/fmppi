@@ -84,6 +84,9 @@ jobs:
           password: ${{ secrets.CPANEL_FTP_PASS }}
           local-dir: ./backend/
           server-dir: ${{ env.CPANEL_BACKEND_DIR }}/
+          protocol: ftps
+          secure: true
+          secure-options: none
           dangerous-clean-slate: false
           exclude: |
             **/__pycache__/**
