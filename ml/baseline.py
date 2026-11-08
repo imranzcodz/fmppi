@@ -12,7 +12,7 @@ import argparse
 import json
 import os
 import sys
-from typing import Dict, List
+from typing import List
 
 import numpy as np
 
@@ -21,8 +21,8 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from ml.config import load_config, resolve  # noqa: E402
-from ml.datasets import (  # noqa: E402
+from ml.config import load_config, resolve
+from ml.datasets import (
     load_kinship_pairs,
     load_verification_pairs,
     synthetic_verification_pairs,
@@ -117,7 +117,7 @@ def main(argv=None):
 
     datasets_to_run = ["lfw", "kinfacew", "orl_faces", "cctv"] if args.dataset == "all" else [args.dataset]
 
-    results: Dict[str, dict] = {"n_pairs_per_dataset": {}, "source": "synthetic" if settings.datasets.synthetic_fallback else "real"}
+    results: dict[str, dict] = {"n_pairs_per_dataset": {}, "source": "synthetic" if settings.datasets.synthetic_fallback else "real"}
 
     for dname in datasets_to_run:
         pairs = _load_dataset_pairs(settings, dname)
@@ -138,7 +138,7 @@ def main(argv=None):
         x_a, x_b, y = data
         results["n_pairs_per_dataset"][dname] = int(len(y))
 
-        ds_results: Dict[str, dict] = {}
+        ds_results: dict[str, dict] = {}
 
         # Baselines
         for name in ("facenet", "arcface", "vggface", "deepface"):

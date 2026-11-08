@@ -308,7 +308,7 @@ def train(config_path: str = "config/default.yaml") -> dict:
                 export_onnx(encoder, onnx_path, opset=settings.onnx.opset, batch_size=settings.onnx.batch_size, input_size=size)
                 run.log_artifact(onnx_path)
                 summary["artifacts"]["onnx"] = onnx_path
-            except Exception as exc:  # pragma: no cover - export env dependent
+            except Exception as exc:  # pragma: no cover - export env dependent, blind catch for optional ONNX export
                 print(f"[warn] ONNX export failed: {exc}", file=sys.stderr)
                 summary["artifacts"]["onnx_error"] = str(exc)
 
@@ -324,7 +324,7 @@ def train(config_path: str = "config/default.yaml") -> dict:
                 if version:
                     summary["artifacts"]["model_version"] = version
                     print(f"[mlflow] registered model version {version}")
-            except Exception as exc:  # pragma: no cover
+            except Exception as exc:  # pragma: no cover - blind catch for optional MLflow registration
                 print(f"[warn] model registration failed: {exc}", file=sys.stderr)
 
         print(json.dumps(summary, indent=2, default=str))
