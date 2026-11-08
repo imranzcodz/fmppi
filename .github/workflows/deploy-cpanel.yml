@@ -66,7 +66,7 @@ jobs:
           server: ${{ secrets.CPANEL_FTP_HOST }}
           username: ${{ secrets.CPANEL_FTP_USER }}
           password: ${{ secrets.CPANEL_FTP_PASS }}
-          local-dir: ./dist
+          local-dir: ./dist/
           server-dir: ${{ env.CPANEL_FRONTEND_DIR }}
           dangerous-clean-slate: false
 
@@ -82,7 +82,7 @@ jobs:
           server: ${{ secrets.CPANEL_FTP_HOST }}
           username: ${{ secrets.CPANEL_FTP_USER }}
           password: ${{ secrets.CPANEL_FTP_PASS }}
-          local-dir: ./backend
+          local-dir: ./backend/
           server-dir: ${{ env.CPANEL_BACKEND_DIR }}
           dangerous-clean-slate: false
           exclude: |
