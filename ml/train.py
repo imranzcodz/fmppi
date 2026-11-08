@@ -17,7 +17,6 @@ import os
 import random
 import sys
 from datetime import datetime
-from typing import Dict
 
 import numpy as np
 import tensorflow as tf
@@ -262,7 +261,7 @@ def train(config_path: str = "config/default.yaml") -> dict:
 
         # --- Per-dataset evaluation (LFW, KinFaceW, ORL_Faces, CCTV) ---
         # Re-load pairs per dataset for held-out per-dataset metrics
-        per_dataset_reports: Dict[str, dict] = {}
+        per_dataset_reports: dict[str, dict] = {}
         for p in pairs:
             p.dataset = p.dataset or "unknown"
         for dname in ("lfw", "kinfacew", "orl_faces", "cctv"):
