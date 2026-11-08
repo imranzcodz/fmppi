@@ -60,20 +60,9 @@ jobs:
           path: ./dist-archive
       - name: Extract frontend dist
         run: tar -xzf dist-archive/frontend-dist.tar.gz
-      - name: Deploy frontend to cPanel public_html via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.CPANEL_FTP_HOST }}
-          protocol: ftps
-          port: 21
-          passive: true
-          secure: true
-          secure-options: none
-          username: ${{ secrets.CPANEL_FTP_USER }}
-          password: ${{ secrets.CPANEL_FTP_PASS }}
-          local-dir: ./dist/
-          server-dir: ${{ env.CPANEL_FRONTEND_DIR }}/
-          dangerous-clean-slate: false
+      - name: Deploy frontend to cPanel via SCP
+        run: |
+          scp -o StrictHostKeyChecking=no -r ./dist/* ${{ secrets.CPANEL_SSH_USER }}@${{ secrets.CPANEL_SSH_HOST }}:${{ env.CPANEL_FRONTEND_DIR }}/
 
   deploy-backend:
     needs: build
@@ -81,37 +70,16 @@ jobs:
     if: github.event_name == 'push' || github.event.inputs.environment == 'production'
     steps:
       - uses: actions/checkout@v4
-      - name: Deploy backend files to cPanel via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.CPANEL_FTP_HOST }}
-          username: ${{ secrets.CPANEL_FTP_USER }}
-          password: ${{ secrets.CPANEL_FTP_PASS }}
-          local-dir: ./backend/
-          server-dir: ${{ env.CPANEL_BACKEND_DIR }}/
-          protocol: ftps
-          port: 21
-          passive: true
-          secure: true
-          secure-options: none
-          dangerous-clean-slate: false
-          exclude: |
-            **/__pycache__/**
-            **/*.pyc
-            **/*.pyo
-            **/.env
-            **/.env.example
-            **/tests/**
-            **/test_*.py
-            **/conftest.py
-            **/coverage/**
-            **/.coverage
-            **/.ruff_cache/**
-            **/*.db
-            **/*.sqlite
-            **/.git/**
-            **/.gitignore
-            uploads/**
+      - name: Deploy backend files to cPanel via SCP
+        run: |
+          scp -o StrictHostKeyChecking=no -r backend/* ${{ secrets.CPANEL_SSH_USER }}@${{ secrets.CPANEL_SSH_HOST }}:${{ env.CPANEL_BACKEND_DIR }}/ \
+            --exclude='__pycache__' \
+            --exclude='*.pyc' --exclude='*.pyo' \
+            --exclude='.env' --exclude='.env.example' \
+            --exclude='tests/' --exclude='test_*.py' --exclude='conftest.py' \
+            --exclude='coverage/' --exclude='.coverage' --exclude='.ruff_cache/' \
+            --exclude='*.db' --exclude='*.sqlite' --exclude='.git/' \
+            --exclude='.gitignore' --exclude='uploads/'
 
   migrate-backend:
     needs: deploy-backend
