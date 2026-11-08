@@ -7,6 +7,9 @@ logger = get_logger("app.security.password")
 
 
 def hash_password(password: str) -> str:
+    # bcrypt has a 72-byte input limit; truncate to avoid errors
+    if len(password.encode("utf-8")) > 72:
+        password = password[:72]
     if settings.PASSWORD_SCHEME == "argon2":
         try:
             import argon2  # type: ignore
@@ -35,6 +38,9 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
             return False
     from passlib.context import CryptContext
 
+    # bcrypt has a 72-byte input limit; truncate to match hash_password
+    if len(plain_password.encode("utf-8")) > 72:
+        plain_password = plain_password[:72]
     pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=settings.BCRYPT_ROUNDS)
     return pwd_context.verify(plain_password, hashed_password)
 
