@@ -64,6 +64,11 @@ jobs:
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.CPANEL_FTP_HOST }}
+          protocol: ftps
+          port: 21
+          passive: true
+          secure: true
+          secure-options: none
           username: ${{ secrets.CPANEL_FTP_USER }}
           password: ${{ secrets.CPANEL_FTP_PASS }}
           local-dir: ./dist/
@@ -85,6 +90,8 @@ jobs:
           local-dir: ./backend/
           server-dir: ${{ env.CPANEL_BACKEND_DIR }}/
           protocol: ftps
+          port: 21
+          passive: true
           secure: true
           secure-options: none
           dangerous-clean-slate: false
